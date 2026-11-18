@@ -299,3 +299,6 @@ dialog.modal h2 { margin: 0 0 12px; font-size: 17px; }
 .sidecol-T { color: var(--t); }
 .setpos { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 4px; }
 .setpos .input { height: 26px; font-size: 12px; flex: 1; min-width: 0; }
+
+.ammo { font-size: 12px; color: var(--text); }
+.ammo-low { color: var(--danger); }

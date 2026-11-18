@@ -16,6 +16,9 @@ export interface PlayerFrame {
   armor: number | null;
   money: number | null;
   weapon: string | null;
+  /** Clip / reserve of the active weapon, null when not applicable or unknown. */
+  clip: number | null;
+  reserve: number | null;
   flags: number;
   floor: number;
   /** False when no valid sample covers this tick (not yet recorded, disconnected, or a data gap). */
@@ -105,7 +108,7 @@ export function lerpYaw(a: number, b: number, t: number): number {
 function playerAt(idx: RoundIndex, tr: PlayerTrack, tick: number, weapons: string[]): PlayerFrame {
   const i = bisectRight(tr.t, tick);
   const base: PlayerFrame = {
-    id: tr.playerId, x: 0, y: 0, z: 0, yaw: 0, alive: false, hp: null, armor: null, money: null, weapon: null,
+    id: tr.playerId, x: 0, y: 0, z: 0, yaw: 0, alive: false, hp: null, armor: null, money: null, weapon: null, clip: null, reserve: null,
     flags: 0, floor: 0, visible: false, interpolated: false,
   };
   if (i < 0) return base;
@@ -133,6 +136,8 @@ function playerAt(idx: RoundIndex, tr: PlayerTrack, tick: number, weapons: strin
     armor: tr.armor ? tr.armor[i] : null,
     money: tr.money ? tr.money[i] : null,
     weapon: tr.weapon && tr.weapon[i] >= 0 ? weapons[tr.weapon[i]] : null,
+    clip: tr.clip && tr.clip[i] >= 0 && !deadByEvent ? tr.clip[i] : null,
+    reserve: tr.reserve && tr.reserve[i] >= 0 && !deadByEvent ? tr.reserve[i] : null,
     flags: tr.flags[i], floor: tr.floor[i],
     visible: !stale || deadByEvent || !sampleAlive,
   };

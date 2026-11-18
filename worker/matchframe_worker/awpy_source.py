@@ -8,6 +8,8 @@ defensively and recorded as a warning, never assumed.
 from __future__ import annotations
 
 import logging
+import os
+import re
 from typing import Any
 
 import polars as pl
@@ -60,17 +62,47 @@ def _num(df: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
     return df.with_columns([pl.col(c).cast(pl.Float64, strict=False) for c in present]) if present else df
 
 
-def load(path: str, *, sample_every: int) -> RawDemo:
-    import awpy  # imported lazily: the synthetic path and the tests do not need it
+_TRUNCATED = re.compile(r"command at byte (\d+).*unexpected end of data")
+
+
+def _open(path: str):
     from awpy import Demo
 
-    try:
-        demo = Demo(path)
-        demo.load("rounds", "kills", "bomb", "grenades", "smokes", "fires", "players", "round_economy")
-    except awpy.InvalidDemoError as e:  # type: ignore[attr-defined]
-        raise InvalidDemo(f"The demo could not be decoded: {e}") from e
+    demo = Demo(path)
+    demo.load("rounds", "kills", "bomb", "grenades", "smokes", "fires", "players", "round_economy")
+    return demo
+
+
+def load(path: str, *, sample_every: int) -> RawDemo:
+    import awpy  # imported lazily: the synthetic path and the tests do not need it
 
     warnings: list[str] = []
+    try:
+        demo = _open(path)
+    except awpy.InvalidDemoError as e:  # type: ignore[attr-defined]
+        # Recordings cut off mid-write end with a partial command. If that is the only problem
+        # (the break is in the last 10% of the file), parse everything before it.
+        m = _TRUNCATED.search(str(e))
+        size = os.path.getsize(path)
+        if not m or int(m.group(1)) < size * 0.9:
+            raise InvalidDemo(f"The demo could not be decoded: {e}") from e
+        cut = int(m.group(1))
+        trimmed = f"{path}.trimmed"
+        with open(path, "rb") as src, open(trimmed, "wb") as dst:
+            remaining = cut
+            while remaining:
+                chunk = src.read(min(1 << 20, remaining))
+                if not chunk:
+                    break
+                dst.write(chunk)
+                remaining -= len(chunk)
+        try:
+            demo = _open(trimmed)
+        except awpy.InvalidDemoError as e2:  # type: ignore[attr-defined]
+            raise InvalidDemo(f"The demo could not be decoded: {e2}") from e2
+        path = trimmed
+        warnings.append(f"The recording ends abruptly; the final incomplete fragment ({size - cut} bytes) was ignored.")
+
     header = dict(demo.header)
     map_name = str(header.get("map_name") or "").strip().lower()
     client = str(header.get("client_name") or "")
@@ -88,6 +120,14 @@ def load(path: str, *, sample_every: int) -> RawDemo:
     if missing:
         warnings.append(f"Parser did not provide snapshot fields: {', '.join(missing)}")
     samples = _ids(samples.select(keep), ["steamid"])
+    # Ammo (clip / reserve) comes from demoparser2 at the same sample ticks; optional.
+    from .ammo import load_ammo
+
+    ammo = load_ammo(path, sorted(samples["tick"].unique().to_list())) if samples.height else None
+    if ammo is not None and ammo.height:
+        samples = samples.join(ammo, on=["tick", "steamid"], how="left")
+    else:
+        warnings.append("Ammo counts are unavailable for this demo.")
     if "inventory" in samples.columns and samples.schema["inventory"] == pl.Utf8:
         samples = samples.with_columns(
             pl.when(pl.col("inventory").is_null() | (pl.col("inventory") == ""))
@@ -175,6 +215,7 @@ def load(path: str, *, sample_every: int) -> RawDemo:
     connections = pl.concat(conns) if conns else pl.DataFrame(schema={"tick": pl.Int64, "steamid": pl.Utf8, "name": pl.Utf8, "event": pl.Utf8})
 
     economy = demo.round_economy if demo.round_economy.height else None
+    team_scores = _team_scores(path, rounds)
     clan_names = {}
     for r in demo.players.to_dicts():
         sid = _str_id(r.get("steamid"))
@@ -209,4 +250,26 @@ def load(path: str, *, sample_every: int) -> RawDemo:
         pov_steamid=None,
         clan_names=clan_names,
         warnings=warnings,
+        team_scores=team_scores,
+    )
+
+
+def _team_scores(path: str, rounds: pl.DataFrame) -> pl.DataFrame | None:
+    """Scoreboard (rounds won by each player's team) at every round's freeze end, via demoparser2."""
+    col = "freeze_end_tick" if "freeze_end_tick" in rounds.columns else "start_tick"
+    ticks = sorted({int(t) for t in rounds[col].drop_nulls().to_list()})
+    if not ticks:
+        return None
+    try:
+        from demoparser2 import DemoParser
+
+        df = DemoParser(path).parse_ticks(["team_rounds_total"], ticks=ticks)
+    except Exception:  # noqa: BLE001 - optional cross-check
+        return None
+    if df is None or len(df) == 0:
+        return None
+    return pl.from_pandas(df[["tick", "steamid", "team_rounds_total"]]).select(
+        pl.col("tick").cast(pl.Int64),
+        pl.col("steamid").cast(pl.UInt64, strict=False).cast(pl.Utf8),
+        pl.col("team_rounds_total").cast(pl.Int64, strict=False).alias("team_score"),
     )

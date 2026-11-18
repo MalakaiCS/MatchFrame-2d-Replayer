@@ -13,7 +13,7 @@ interface UploadSlot {
   maxBytes: number;
 }
 
-const MAX_HINT = 512;
+const MAX_HINT = 1024;
 
 async function sniff(file: File): Promise<string | null> {
   const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
@@ -112,7 +112,7 @@ export function UploadFlow() {
   return (
     <div className="page" style={{ maxWidth: 720 }}>
       <h1>Upload a demo</h1>
-      <p className="page-sub">CS2 demos as <span className="mono">.dem</span>, or compressed as <span className="mono">.dem.bz2</span>, <span className="mono">.dem.gz</span>, <span className="mono">.zip</span> or <span className="mono">.rar</span> with one demo inside. Up to {MAX_HINT} MiB per upload. Uploads are private until you share them.</p>
+      <p className="page-sub">CS2 demos as <span className="mono">.dem</span>, or compressed as <span className="mono">.dem.bz2</span>, <span className="mono">.dem.gz</span>, <span className="mono">.zip</span> or <span className="mono">.rar</span>. An archive with several maps (e.g. a BO3) becomes one replay per map, linked as a series. Up to {MAX_HINT / 1024} GiB per upload. Uploads are private until you share them.</p>
 
       <div className="steps" aria-label="Progress">
         <span className="step" data-state={step(["uploading", "finalising"], ["processing", "ready"])}>1. Upload</span>

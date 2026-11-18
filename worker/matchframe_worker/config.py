@@ -31,7 +31,7 @@ class Config:
     s3_region: str = field(default_factory=lambda: os.environ.get("S3_REGION", "auto"))
     map_registry_path: str = field(default_factory=lambda: os.environ.get("MAP_REGISTRY_PATH", _default_registry()))
     work_dir: str = field(default_factory=lambda: os.environ.get("WORKER_TMP_DIR", "/tmp/matchframe-worker"))
-    max_demo_bytes: int = field(default_factory=lambda: _int("MAX_DEMO_BYTES", 512 * 1024 * 1024))
+    max_demo_bytes: int = field(default_factory=lambda: _int("MAX_DEMO_BYTES", 1024 * 1024 * 1024))
     # Cap on the demo extracted from a .bz2/.gz/.zip/.rar upload (tournament demos are often 300-500 MiB).
     max_extracted_bytes: int = field(default_factory=lambda: _int("MAX_EXTRACTED_DEMO_BYTES", 1536 * 1024 * 1024))
     max_tmp_bytes: int = field(default_factory=lambda: _int("WORKER_MAX_TMP_BYTES", 4 * 1024 * 1024 * 1024))

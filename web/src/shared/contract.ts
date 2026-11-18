@@ -48,6 +48,10 @@ export interface Capabilities {
   health: boolean;
   armor: boolean;
   money: boolean;
+  /** Clip / reserve ammo for the active weapon. Absent on replays processed before ammo support. */
+  ammo?: boolean;
+  /** "estimated": reserve derived from the standard reserve and reloads (GOTV does not record it reliably). */
+  reserveAmmo?: "estimated" | "recorded" | "none";
   inventory: boolean;
   economy: boolean;
   bombPosition: boolean;
@@ -138,6 +142,12 @@ export interface PlayerTrack {
   money: number[] | null;
   /** Index into RoundPayload.weapons, -1 for none. */
   weapon: number[] | null;
+  /**
+   * Active-weapon ammo; -1 when not applicable (melee, grenades, bomb) or unknown. Absent on older replays.
+   * `clip` is recorded. `reserve` is ESTIMATED (standard reserve minus reloads; see capabilities.reserveAmmo).
+   */
+  clip?: number[] | null;
+  reserve?: number[] | null;
   /** Bit flags: 1 bomb, 2 defuser, 4 helmet, 8 defusing, 16 planting, 32 scoped, 64 blinded. */
   flags: number[];
   /** Floor index into the map registry floors. */

@@ -50,6 +50,30 @@ Versions recorded per replay: schema version, parser name and version, worker ve
 - The client interpolates only between consecutive samples that are both alive, on the same floor, with no discontinuity, within 2 sample intervals, and not across the player's recorded death. Yaw takes the shortest arc. A held sample is valid for 2 intervals; after that the player is hidden until data resumes.
 - A recorded kill makes the victim dead from the kill tick, whatever the sampled health.
 
+## Ammo
+
+- **Clip** (`track.clip`): recorded. It is read with demoparser2 (`active_weapon_ammo`, pinned 0.42.2) at the same sample ticks, because Awpy 3.3.0 snapshots have no ammo fields. On real demos it counts down shot by shot and refills on reload.
+- **Reserve** (`track.reserve`): **estimated**, and `capabilities.reserveAmmo = "estimated"`. GOTV demos network `Weapon.m_pReserveAmmo` in a coarse form (values 0–4 that do not track bullets, checked on real demos 2026-11-19).
+  - The estimate starts each weapon at its standard CS2 reserve (`worker/matchframe_worker/ammo.py`, `MAX_RESERVE`), since CS2 refills ammo at round start. It then subtracts the rounds loaded by each reload.
+  - Picking up another player's partly used weapon is not detected, so the estimate can then be too high.
+  - The `MAX_RESERVE` table follows current CS2 values and should be re-checked after weapon balance patches.
+- `-1` means not applicable (melee, grenades, bomb) or unknown. The viewer shows `clip/reserve` next to the active weapon, with the reserve dimmed and described as estimated.
+
+## Partial and damaged recordings
+
+- **Recording starts mid-match** (e.g. a GOTV restart): display numbers use the match's own round numbers (`r07`, "Round 7"), so pistol and overtime detection stay correct. The score before the first recorded round comes from the in-game scoreboard (`team_rounds_total`, via demoparser2). `capabilities.recordingStartsAtRound` records where the recording begins.
+- **Round start not recorded**: the start is the freeze end minus `mp_freezetime`, or the first recorded tick.
+- **Truncated recording** (file ends mid-command): if the decoder fails in the last 10% of the file, the incomplete tail is ignored, the demo is parsed, and a warning records how many bytes were dropped.
+- **Score cross-check**: before every round, the computed score is compared with the scoreboard. Any mismatch adds a warning. On all 15 real demos there were no mismatches.
+
+## Multi-map archives
+
+A `.zip`/`.rar` with 2–7 `.dem` members (e.g. a BO3 download) becomes one replay per map in one series, ordered by member name (m1, m2, …):
+
+- The uploaded replay keeps map 1. Maps 2..n get sibling replays (`<id>M<n>`), each with its own source object and parse job, the same owner, team and visibility, and the title "<title> · map n".
+- Child IDs are deterministic, so a retried job never duplicates maps.
+- The viewer's header shows a map selector for the series.
+
 ## Bomb
 
 Bomb states come from Awpy bomb actions (`pickup`, `drop`, `start_plant`, `interrupt_plant`, `finish_plant`, `defuse`), the raw events `bomb_begindefuse`, `bomb_abortdefuse` and `bomb_exploded`, and the carrier flag on samples. An explosion with no event is inferred from the round-end reason and marked `provenance: inferred`. Positions are recorded only when the source has them. Defusing, defused and exploded states reuse the plant position.

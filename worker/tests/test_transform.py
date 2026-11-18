@@ -216,3 +216,21 @@ def test_side_strings_from_awpy_are_normalised():
 
     assert _norm_side("counter-terrorist") == "CT" and _norm_side("terrorist") == "T"
     assert _norm_side(3) == "CT" and _norm_side(2) == "T" and _norm_side(None) is None
+
+
+def test_reserve_estimate_from_reloads():
+    from matchframe_worker.ammo import estimate_reserve, has_ammo
+
+    w = ["ak47"] * 6 + ["knife"] + ["ak47"] * 2
+    c = [30, 20, 10, 30, 25, 30, -1, 30, 29]
+    # 90 -> reload +20 -> 70 -> reload +5 -> 65; switching to the knife and back keeps 65.
+    assert estimate_reserve(w, c) == [90, 90, 90, 70, 70, 65, -1, 65, 65]
+    assert estimate_reserve(["laser"], [5]) == [-1]
+    assert not has_ammo("knife_karambit") and not has_ammo("smokegrenade") and has_ammo("ak47")
+
+
+def test_synthetic_ammo_in_payload(mirage):
+    tr = next(t for t in mirage.payloads["r02"]["tracks"] if t["playerId"] == "s:76561198000000001")
+    assert tr["clip"] is not None and any(c >= 0 for c in tr["clip"])
+    assert mirage.manifest["capabilities"]["ammo"] is True
+    assert mirage.manifest["capabilities"]["reserveAmmo"] == "estimated"

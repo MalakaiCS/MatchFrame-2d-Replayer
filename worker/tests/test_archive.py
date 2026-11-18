@@ -44,6 +44,15 @@ def test_zip_single_demo_ignores_other_files_and_paths(tmp_path):
     assert not (tmp_path.parent / "evil").exists()
 
 
+def test_series_members_in_map_order(tmp_path):
+    from matchframe_worker.archive import demo_members, extract_member, list_demos
+
+    assert demo_members(["x-m10-a.dem", "x-m2-b.dem", "x-m1-c.dem", "notes.txt"]) == ["x-m1-c.dem", "x-m2-b.dem", "x-m10-a.dem"]
+    _zip(tmp_path / "s.zip", ["b-m2.dem", "a-m1.dem"])
+    assert list_demos("zip", tmp_path / "s.zip") == ["a-m1.dem", "b-m2.dem"]
+    assert extract_member("zip", tmp_path / "s.zip", "b-m2.dem", tmp_path / "o.dem", 10 << 20) == len(DEMO)
+
+
 def test_zip_multiple_or_no_demo(tmp_path):
     _zip(tmp_path / "m.zip", ["m1.dem", "m2.dem"])
     with pytest.raises(UnsupportedDemo) as e:

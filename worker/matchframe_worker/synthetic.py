@@ -197,6 +197,7 @@ def generate(params: dict) -> RawDemo:
                         active_weapon=None if dead else inv[2] if len(inv) > 2 else inv[1],
                         has_bomb=has_bomb, has_defuser=side == "CT" and ev_val >= 4800, has_helmet=ev_val >= 4800,
                         is_defusing=False, is_scoped=False, is_blinded=False,
+                        clip=None if dead else max(0, 30 - ((t - start) // 256) % 31),
                         inventory=[] if dead else [x_ for x_ in inv if x_ != "weapon_c4" or has_bomb],
                     )
                 )

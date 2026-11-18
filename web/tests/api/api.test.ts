@@ -105,7 +105,7 @@ describe("upload and processing", () => {
   });
 
   it("rejects oversized, compressed and non-demo uploads with actionable errors", async () => {
-    const big = await owner.json("/api/uploads", { method: "POST", json: { filename: "x.dem", size: 600 * 2 ** 20 } }, 400);
+    const big = await owner.json("/api/uploads", { method: "POST", json: { filename: "x.dem", size: 1100 * 2 ** 20 } }, 400);
     expect(big.error.code).toBe("TOO_LARGE");
     const sz = await owner.json("/api/uploads", { method: "POST", json: { filename: "x.7z", size: 100 } }, 400);
     expect(sz.error.code).toBe("UNSUPPORTED_ARCHIVE");

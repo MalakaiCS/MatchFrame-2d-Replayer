@@ -78,6 +78,26 @@ def test_compressed_upload_is_extracted_and_parsed(env, compress):
     assert r["status"] == "ready" and r["map_id"] == "de_dust2" and r["round_count"] == 3
 
 
+def test_multi_map_archive_becomes_a_series(env):
+    import io, zipfile
+    cfg, conn, storage, uid = env
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("teams-m2-dust2.dem", encode({"map": "de_dust2", "winners": "AB"}))
+        z.writestr("teams-m1-mirage.dem", encode({"map": "de_mirage", "winners": "ABA"}))
+    rid, _ = make_replay(conn, storage, uid, buf.getvalue())
+    conn.execute("update replays set title = 'Grand final' where id = %s", (rid,))
+    assert run_once(cfg, conn, storage)          # map 1 + fan-out
+    child = conn.execute("select * from replays where id = %s", (rid + "M2",)).fetchone()
+    assert child and child["series_id"] == rid and child["series_map_index"] == 2 and child["title"] == "Grand final · map 2"
+    assert run_once(cfg, conn, storage)          # map 2
+    parent = replay(conn, rid)
+    assert parent["status"] == "ready" and parent["map_id"] == "de_mirage" and parent["series_map_index"] == 1
+    assert replay(conn, rid + "M2")["map_id"] == "de_dust2" and replay(conn, rid + "M2")["status"] == "ready"
+    # A retried fan-out does not duplicate maps.
+    assert conn.execute("select count(*) as n from replays where series_id = %s", (rid,)).fetchone()["n"] == 2
+
+
 def test_duplicate_enqueue_is_idempotent(env):
     cfg, conn, storage, uid = env
     rid, _ = make_replay(conn, storage, uid, encode({"winners": "AB"}))

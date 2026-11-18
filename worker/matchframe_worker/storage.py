@@ -13,6 +13,7 @@ from .errors import SourceMissing, TransientError
 class Storage(Protocol):
     def download(self, key: str, dest: str, max_bytes: int) -> int: ...
     def put_bytes(self, key: str, data: bytes, content_type: str, content_encoding: str | None = None) -> None: ...
+    def put_file(self, key: str, path: str, content_type: str) -> None: ...
     def exists(self, key: str) -> bool: ...
     def size(self, key: str) -> int | None: ...
     def delete(self, key: str) -> None: ...
@@ -46,6 +47,13 @@ class FsStorage:
                     raise ValueError("source exceeds the size limit")
                 fo.write(chunk)
         return n
+
+    def put_file(self, key: str, path: str, content_type: str) -> None:
+        p = self._p(key)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(p.suffix + ".part")
+        shutil.copyfile(path, tmp)
+        os.replace(tmp, p)
 
     def put_bytes(self, key: str, data: bytes, content_type: str, content_encoding: str | None = None) -> None:
         p = self._p(key)
@@ -116,6 +124,12 @@ class S3Storage:
         extra = {"ContentEncoding": content_encoding} if content_encoding else {}
         try:
             self.s3.put_object(Bucket=self.bucket, Key=_safe(key), Body=data, ContentType=content_type, **extra)
+        except Exception as e:  # noqa: BLE001
+            raise TransientError(f"object storage error: {e}") from e
+
+    def put_file(self, key: str, path: str, content_type: str) -> None:
+        try:
+            self.s3.upload_file(path, self.bucket, _safe(key), ExtraArgs={"ContentType": content_type})
         except Exception as e:  # noqa: BLE001
             raise TransientError(f"object storage error: {e}") from e
 

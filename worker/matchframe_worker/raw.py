@@ -55,6 +55,8 @@ class RawDemo:
     pov_steamid: str | None = None
     clan_names: dict[str, str] = field(default_factory=dict)  # steamid -> clan name
     warnings: list[str] = field(default_factory=list)
+    # Scoreboard rounds won per player (steamid) at a tick: tick, steamid, team_score. Optional.
+    team_scores: pl.DataFrame | None = None
 
 
 def empty(schema: dict[str, pl.DataType]) -> pl.DataFrame:

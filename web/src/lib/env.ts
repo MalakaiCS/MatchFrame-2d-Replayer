@@ -1,7 +1,7 @@
 /** Server-side configuration. Never import from client components. */
 export const env = {
   appOrigin: process.env.APP_ORIGIN ?? "http://localhost:3000",
-  maxDemoBytes: Number(process.env.MAX_DEMO_BYTES ?? 512 * 1024 * 1024),
+  maxDemoBytes: Number(process.env.MAX_DEMO_BYTES ?? 1024 * 1024 * 1024),
   maxAudioBytes: Number(process.env.MAX_AUDIO_BYTES ?? 300 * 1024 * 1024),
   uploadSlotSeconds: Number(process.env.UPLOAD_SLOT_SECONDS ?? 15 * 60),
   pendingSourceTtlSeconds: Number(process.env.PENDING_SOURCE_TTL_S ?? 3 * 24 * 3600),

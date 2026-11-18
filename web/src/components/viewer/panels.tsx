@@ -70,6 +70,13 @@ export function PlayersPanel({
                   {known ? (
                     <span className="player-sub">
                       <span className="inv-icons"><WeaponIcon name={f?.weapon} height={16} label={`holding ${short(f?.weapon)}`} /></span>
+                      {f?.clip != null ? (
+                        <span className="mono ammo" title={f.reserve != null ? "Magazine / reserve (reserve estimated from reloads)" : "Magazine"}
+                          aria-label={`${f.clip} in magazine${f.reserve != null ? `, about ${f.reserve} in reserve` : ""}`}>
+                          <span>{f.clip}</span>
+                          {f.reserve != null ? <span className="faint">/{f.reserve}</span> : null}
+                        </span>
+                      ) : null}
                       {caps.armor && f?.armor ? (
                         <span className="inv-icons" title={`${f.flags & FLAGS.helmet ? "Kevlar + helmet" : "Kevlar"} ${f.armor}`}>
                           <WeaponIcon name={f.flags & FLAGS.helmet ? "armor_helmet" : "armor"} label={f.flags & FLAGS.helmet ? "Kevlar and helmet" : "Kevlar"} /> {f.armor}

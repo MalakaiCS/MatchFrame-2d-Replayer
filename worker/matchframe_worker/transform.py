@@ -15,6 +15,7 @@ import polars as pl
 
 from . import WORKER_VERSION
 from .errors import NoPlayableRounds
+from .ammo import estimate_reserve, has_ammo
 from .maps import MapInfo
 from .raw import RawDemo
 
@@ -147,7 +148,17 @@ def select_rounds(raw: RawDemo) -> tuple[list[_Round], list[dict], list[str]]:
     """
     warnings: list[str] = []
     excluded: list[dict] = []
-    rows = sorted(_rows(raw.rounds), key=lambda r: (r["start_tick"], r["round_num"]))
+    rows = _rows(raw.rounds)
+    # A round whose start was not recorded (recording began during it) starts at its freeze end
+    # minus the freeze time, or at the first recorded tick.
+    freeze_ticks = int(round(float((raw.convars or {}).get("mp_freezetime", 15) or 15) * raw.tick_rate))
+    first_tick = int(raw.samples["tick"].min()) if raw.samples.height else 0
+    for r in rows:
+        if r.get("start_tick") is None:
+            anchor = r.get("freeze_end_tick") if r.get("freeze_end_tick") is not None else r.get("end_tick")
+            r["start_tick"] = max(first_tick, int(anchor) - freeze_ticks) if anchor is not None else first_tick
+            warnings.append(f"Round {r['round_num']} start was not recorded; it starts at the first recorded moment.")
+    rows = sorted(rows, key=lambda r: (r["start_tick"], r["round_num"]))
     # Restart detection.
     restart_idx = 0
     for i in range(1, len(rows)):
@@ -361,20 +372,34 @@ def build(
     ]
 
     # --- per-round summaries and payloads
+    # Display numbers are the match's own round numbers, so a recording that starts mid-match
+    # (e.g. at round 7) keeps "Round 7"; pistol/overtime detection uses the same numbering.
+    offset = rounds[0].num - 1 if rounds[0].num > 1 and all(b.num == a.num + 1 for a, b in zip(rounds, rounds[1:])) else 0
+    board = _scoreboard(raw, samples, team_of, rounds)
     score = {"A": 0, "B": 0}
+    if offset:
+        seed = board.get(0)
+        if seed:
+            score = dict(seed)
+            warnings.append(f"The recording starts at round {offset + 1}; the score before it ({seed['A']}:{seed['B']}) comes from the scoreboard.")
+        else:
+            warnings.append(f"The recording starts at round {offset + 1}; earlier rounds are missing and the score counts from 0:0.")
+    mismatches = 0
     summaries: list[dict] = []
     payloads: dict[str, dict] = {}
     econ_by_round = _parser_economy(raw)
     has_econ = _col(samples, "equipment_value")
 
     for i, rd in enumerate(rounds):
-        display = i + 1
+        display = i + 1 + offset
         rid = f"r{display:02d}"
         a_side = a_side_by_round[i]
         sides = {"A": a_side, "B": "T" if a_side == "CT" else "CT"}
         winner = None
         if rd.winner_side:
             winner = "A" if rd.winner_side == a_side else "B"
+        if i in board and board[i] != score and (i or not offset):
+            mismatches += 1
         before = dict(score)
         if winner:
             score[winner] += 1
@@ -432,7 +457,10 @@ def build(
             }
         )
 
+    if mismatches:
+        warnings.append(f"Computed score differs from the in-game scoreboard before {mismatches} round(s).")
     caps = _capabilities(raw, samples, map_info, timing, summaries)
+    caps["recordingStartsAtRound"] = offset + 1
     manifest = {
         "schemaVersion": SCHEMA_VERSION,
         "replayId": replay_id,
@@ -467,6 +495,25 @@ def build(
     return BuildResult(manifest=manifest, payloads=payloads)
 
 
+def _scoreboard(raw: RawDemo, samples: pl.DataFrame, team_of: dict[str, str], rounds: list["_Round"]) -> dict[int, dict[str, int]]:
+    """In-game score (team A, team B) before each kept round, from the scoreboard, when available."""
+    if raw.team_scores is None or raw.team_scores.height == 0:
+        return {}
+    by_tick: dict[int, dict[str, int]] = {}
+    for r in raw.team_scores.to_dicts():
+        if r["team_score"] is None:
+            continue
+        team = team_of.get(player_id(r["steamid"], None))
+        if team:
+            by_tick.setdefault(int(r["tick"]), {})[team] = int(r["team_score"])
+    out = {}
+    for i, rd in enumerate(rounds):
+        s = by_tick.get(rd.freeze_end if rd.freeze_end is not None else rd.start)
+        if s and "A" in s and "B" in s:
+            out[i] = {"A": s["A"], "B": s["B"]}
+    return out
+
+
 def _parser_economy(raw: RawDemo) -> dict[tuple[int, str], str]:
     out = {}
     for r in _rows(raw.economy):
@@ -487,6 +534,8 @@ def _capabilities(raw: RawDemo, samples: pl.DataFrame, m: MapInfo, timing: dict,
         "health": _col(samples, "health"),
         "armor": _col(samples, "armor"),
         "money": _col(samples, "money"),
+        "ammo": _col(samples, "clip"),
+        "reserveAmmo": "estimated" if _col(samples, "clip") else "none",
         "inventory": _col(samples, "inventory"),
         "economy": _col(samples, "equipment_value"),
         "bombPosition": _col(raw.bomb, "x"),
@@ -581,7 +630,7 @@ def _round_payload(
         pid = pid[0] if isinstance(pid, tuple) else pid
         rows = g.to_dicts()
         coverage[pid] = round(min(1.0, len(rows) / expected), 3)
-        t, xs, ys, zs, yaws, alive, hp, ar, money, wpn, flags, floor, disc = ([] for _ in range(13))
+        t, xs, ys, zs, yaws, alive, hp, ar, money, wpn, flags, floor, disc, clip, reserve = ([] for _ in range(15))
         prev = None
         prev_inv: tuple | None = None
         for r in rows:
@@ -622,6 +671,10 @@ def _round_payload(
             ar.append(int(r.get("armor") or 0))
             money.append(int(r.get("money") or 0))
             wpn.append(wi(r.get("active_weapon")))
+            # -1 = not applicable (melee, grenades, bomb) or unknown.
+            gun = has_ammo(r.get("active_weapon")) and is_alive
+            clip.append(int(r["clip"]) if gun and r.get("clip") is not None and r["clip"] >= 0 else -1)
+
             flags.append(f)
             floor.append(fl)
             disc.append(d)
@@ -645,6 +698,8 @@ def _round_payload(
                 "armor": ar if "armor" in cols else None,
                 "money": money if "money" in cols else None,
                 "weapon": wpn if "active_weapon" in cols else None,
+                "clip": clip if "clip" in cols else None,
+                "reserve": estimate_reserve([weapons[i] if i >= 0 else None for i in wpn], clip) if "clip" in cols else None,
                 "flags": flags,
                 "floor": floor,
                 "disc": disc,

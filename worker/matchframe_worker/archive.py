@@ -53,6 +53,52 @@ def _copy_capped(src, dst_path: Path, max_bytes: int) -> int:
     return n
 
 
+MAX_SERIES_DEMOS = 7
+
+
+def demo_members(names: list[str]) -> list[str]:
+    """`.dem` members in map order (m1, m2, ...; natural sort on the member name)."""
+    import re
+
+    dems = [n for n in names if n.lower().endswith(".dem") and not n.endswith("/")]
+    key = lambda n: [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", n.rsplit("/", 1)[-1])]  # noqa: E731
+    return sorted(dems, key=key)
+
+
+def list_demos(kind: str, src: Path, timeout_s: int = 600) -> list[str]:
+    """Demo members of a zip/rar archive (empty list for single-stream formats)."""
+    try:
+        if kind == "zip":
+            with zipfile.ZipFile(src) as z:
+                return demo_members(z.namelist())
+        if kind == "rar":
+            bsdtar = shutil.which("bsdtar")
+            if not bsdtar:
+                raise UnsupportedDemo("RAR archives are not supported on this server. Extract the .dem and upload it.", code="UNSUPPORTED_FORMAT")
+            listing = subprocess.run([bsdtar, "-tf", str(src)], capture_output=True, text=True, timeout=timeout_s)
+            if listing.returncode != 0:
+                raise InvalidDemo("The RAR archive is damaged or password-protected.", code="ARCHIVE_CORRUPT")
+            return demo_members([n for n in listing.stdout.splitlines() if n])
+    except (zipfile.BadZipFile, OSError) as e:
+        raise InvalidDemo(f"The {kind} archive is damaged or incomplete ({type(e).__name__}).", code="ARCHIVE_CORRUPT") from e
+    return []
+
+
+def extract_member(kind: str, src: Path, name: str, dst: Path, max_bytes: int, timeout_s: int = 600) -> int:
+    """Extract one named member of a zip/rar archive to `dst` (member path never used as a filesystem path)."""
+    try:
+        if kind == "zip":
+            with zipfile.ZipFile(src) as z, z.open(name) as f:
+                return _copy_capped(f, dst, max_bytes)
+        if kind == "rar":
+            return _extract_libarchive(src, dst, max_bytes, timeout_s, member=name)
+    except (DemoTooLarge, InvalidDemo, UnsupportedDemo):
+        raise
+    except (OSError, EOFError, zipfile.BadZipFile, ValueError, zlib.error) as e:
+        raise InvalidDemo(f"The {kind} archive is damaged or incomplete ({type(e).__name__}).", code="ARCHIVE_CORRUPT") from e
+    raise UnsupportedDemo(f"Unsupported archive type: {kind}.", code="UNSUPPORTED_FORMAT")
+
+
 def _single_dem(names: list[str]) -> str:
     dems = [n for n in names if n.lower().endswith(".dem") and not n.endswith("/")]
     if not dems:
@@ -87,14 +133,17 @@ def extract(kind: str, src: Path, dst: Path, max_bytes: int, timeout_s: int = 60
     raise UnsupportedDemo(f"Unsupported archive type: {kind}.", code="UNSUPPORTED_FORMAT")
 
 
-def _extract_libarchive(src: Path, dst: Path, max_bytes: int, timeout_s: int) -> int:
+def _extract_libarchive(src: Path, dst: Path, max_bytes: int, timeout_s: int, member: str | None = None) -> int:
     bsdtar = shutil.which("bsdtar")
     if not bsdtar:
         raise UnsupportedDemo("RAR archives are not supported on this server. Extract the .dem and upload it.", code="UNSUPPORTED_FORMAT")
-    listing = subprocess.run([bsdtar, "-tf", str(src)], capture_output=True, text=True, timeout=timeout_s)
-    if listing.returncode != 0:
-        raise InvalidDemo("The RAR archive is damaged or password-protected.", code="ARCHIVE_CORRUPT")
-    name = _single_dem([n for n in listing.stdout.splitlines() if n])
+    if member is None:
+        listing = subprocess.run([bsdtar, "-tf", str(src)], capture_output=True, text=True, timeout=timeout_s)
+        if listing.returncode != 0:
+            raise InvalidDemo("The RAR archive is damaged or password-protected.", code="ARCHIVE_CORRUPT")
+        name = _single_dem([n for n in listing.stdout.splitlines() if n])
+    else:
+        name = member
     # Stream the one member to stdout; the member name is a pattern argument, never an output path.
     proc = subprocess.Popen([bsdtar, "-xOf", str(src), "--", name], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     try:

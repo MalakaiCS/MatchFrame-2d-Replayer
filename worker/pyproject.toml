@@ -8,6 +8,7 @@ dependencies = [
   "polars==2.1.0",
   "psycopg[binary]==3.3.9",
   "boto3==1.44.5",
+  "demoparser2==0.42.2",
 ]
 
 [project.optional-dependencies]

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import jobs
 from .config import Config
-from .archive import archive_kind, extract
+from .archive import MAX_SERIES_DEMOS, archive_kind, extract, extract_member, list_demos
 from .demo_header import classify_header
 from .errors import DemoTooLarge, JobError, LeaseLost, ParseResourceLimit, SourceMissing, TransientError
 from .storage import Storage
@@ -101,6 +101,12 @@ def process_parse(cfg: Config, conn, storage: Storage, job: dict) -> None:
             with open(src, "rb") as fh:
                 head = fh.read(16)
             kind = archive_kind(head)
+            members = list_demos(kind, src) if kind in ("zip", "rar") else []
+            if len(members) > 1:
+                src = _fan_out_series(cfg, conn, storage, rep, job, kind, src, members, workdir)
+                kind = None
+                with open(src, "rb") as fh:
+                    head = fh.read(16)
             if kind:
                 extracted = workdir / "extracted.dem"
                 n = extract(kind, src, extracted, cfg.max_extracted_bytes)
@@ -153,6 +159,55 @@ def process_parse(cfg: Config, conn, storage: Storage, job: dict) -> None:
         except Exception:  # noqa: BLE001
             log.warning("source cleanup failed for %s; scheduling retry", rep["id"])
             conn.execute("update replays set source_expires_at = now() where id = %s", (rep["id"],))
+
+
+def _child_id(parent_id: str, index: int) -> str:
+    """Deterministic, so a retried job never creates duplicate series maps."""
+    return f"{parent_id}M{index}"
+
+
+def _fan_out_series(cfg: Config, conn, storage: Storage, rep: dict, job: dict, kind: str, src: Path,
+                    members: list[str], workdir: Path) -> Path:
+    """A multi-map archive (e.g. a BO3) becomes one replay per map in the same series.
+
+    This replay keeps map 1; maps 2..n get sibling replays (same owner, team and visibility)
+    with their own extracted source object and parse job. Returns the path of map 1's demo.
+    """
+    from .errors import UnsupportedDemo
+
+    if len(members) > MAX_SERIES_DEMOS:
+        raise UnsupportedDemo(f"The archive contains {len(members)} demos; at most {MAX_SERIES_DEMOS} maps per upload.",
+                              code="ARCHIVE_TOO_MANY_DEMOS")
+    series_id = rep["series_id"] or rep["id"]
+    base_title = rep["title"] or (rep["source_filename"] or "Series").rsplit(".", 1)[0]
+    first = workdir / "map1.dem"
+    extract_member(kind, src, members[0], first, cfg.max_extracted_bytes)
+    for i, name in enumerate(members[1:], start=2):
+        cid = _child_id(rep["id"], i)
+        if conn.execute("select 1 from replays where id = %s", (cid,)).fetchone():
+            continue  # created by an earlier attempt
+        out = workdir / f"map{i}.dem"
+        size = extract_member(kind, src, name, out, cfg.max_extracted_bytes)
+        key = f"uploads/{rep['owner_id']}/{cid}.dem"
+        storage.put_file(key, str(out), "application/octet-stream")
+        out.unlink()
+        with conn.transaction():
+            conn.execute(
+                "insert into replays(id, owner_id, team_id, title, status, visibility, source_key, source_size, source_filename, "
+                "source_expires_at, series_id, series_map_index) values (%s,%s,%s,%s,'queued',%s,%s,%s,%s, now() + interval '3 days', %s, %s) "
+                "on conflict (id) do nothing",
+                (cid, rep["owner_id"], rep["team_id"], f"{base_title} · map {i}", rep["visibility"], key, size,
+                 name.rsplit("/", 1)[-1], series_id, i),
+            )
+            conn.execute("insert into jobs(replay_id, revision, kind) values (%s, 1, 'parse') on conflict do nothing", (cid,))
+        log.info("series %s: queued map %d (%s) as %s", series_id, i, name, cid)
+    conn.execute(
+        "update replays set series_id = coalesce(series_id, %s), series_map_index = coalesce(series_map_index, 1), "
+        "title = coalesce(title, %s) where id = %s",
+        (series_id, f"{base_title} · map 1", rep["id"]),
+    )
+    src.unlink()
+    return first
 
 
 def process_cleanup(cfg: Config, conn, storage: Storage, job: dict) -> None:

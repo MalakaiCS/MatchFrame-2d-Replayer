@@ -682,7 +682,9 @@ function HalfScores({ manifest }: { manifest: Manifest }) {
     { label: "2nd half", rounds: manifest.rounds.filter((r) => !r.isOvertime && r.half === 2) },
     { label: "Overtime", rounds: manifest.rounds.filter((r) => r.isOvertime) },
   ].filter((g) => g.rounds.length);
-  const won = (rs: RoundSummary[], k: "A" | "B") => rs.filter((r) => r.winner === k).length;
+  // Score gained in a group = score after its last round minus score before its first round. This stays
+  // correct for recordings that start mid-half (the "before" score comes from the in-game scoreboard).
+  const won = (rs: RoundSummary[], k: "A" | "B") => rs[rs.length - 1].scoreAfter[k] - (rs[0].half === 1 && !rs[0].isOvertime ? 0 : rs[0].scoreBefore[k]);
   return (
     <span className="half-scores faint" aria-label={groups.map((g) => `${g.label} ${won(g.rounds, "A")} to ${won(g.rounds, "B")}`).join(", ")}>
       (

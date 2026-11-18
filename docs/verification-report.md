@@ -79,6 +79,10 @@ Owner-supplied demos via Google Drive: 7 tournament (`.rar`), 1 scrim (`.zip`) a
 | Digital Crusade | Anubis | SAW vs Bayankhongor | 13–1 | 11:1; 2:0 | 14 | 5.9 + 3.1 s | 522 MiB | 73 / 130 / 178 |
 | Scrim (8PM) | Inferno | TEAM1 vs TEAM2 | 18–6 | 11:1; 7:5 | 24 | 10.9 + 6.2 s | 913 MiB | 77 / 173 / 231 |
 | Matchmaking ×3 | Mirage | Team A vs Team B (no clan tags) | 18–6 · 15–9 · 7–17 | n/a | 24 each | ~10 + 7 s | 776–899 MiB | 63–91 / 133–163 / 208–247 |
+| BLAST Rivals BO3, map 1 (**overtime**) | Ancient | FURIA vs Falcons | 16–14 | 7:5; 5:7; OT 4:2 | 30 | 17.8 s load | 2.3 GiB | n/a |
+| BLAST Rivals BO3, map 2 (**starts at round 7**) | Dust2 | Falcons vs FURIA | 5–13 (seeded 4:2) | 5:7; 0:6 | 12 recorded | 11.9 s load | 1.6 GiB | n/a |
+| CCT BO3, map 1 (**truncated**, 56 bytes) | Nuke | BAKS vs The Last Resort | 13–3 | 10:2; 3:1 | 16 | 6.7 s load | 1.0 GiB | n/a |
+| CCT BO3, map 2 | Cache | The Last Resort vs BAKS | 4–13 | 1:11; 3:2 | 17 | 7.5 s load | 1.1 GiB | n/a |
 
 Findings:
 
@@ -92,6 +96,16 @@ Findings:
 - **Calibration sanity check**: real-play position bounds fall inside the 1024 px image for every map. This is **not** the three-landmark verification, which still needs radar images.
 - **Through the real app**: `.rar` Nuke (234 MB, 363 MB extracted) went from upload to ready in 23.7 s. `.dem.bz2` Mirage (259 MB, 361 MB extracted) took 43.3 s. Worker parse took about 15 s with a peak child RSS of about 911 MiB.
 - **Payload size** on real demos: median 130–197 KB per round (gzip). Time to interactive at 25 Mbps is estimated at under 0.5 s plus RTT, and still needs measuring on the deployed origin.
+
+- **BO3 archives**: both real BO3 `.rar` uploads (596 MB and 294 MB) split into series of two replays each, with the map selector working in the viewer.
+- **Ammo**: the clip is exact on real demos (AK 30, M4A1-S 20, AWP 5, falling shot by shot). The reserve is estimated; see data-contract.md#ammo.
+- **Real-data bugs found and fixed**:
+  - a round with no recorded start (crashed the transform);
+  - a recording starting at round 7 (round numbers and score would have been wrong);
+  - a truncated recording (rejected outright before);
+  - corrupt gzip (would have retried forever);
+  - the BLAST BO3 archive exceeding the 512 MiB upload cap (default raised to 1 GiB).
+- **Peak worker memory** reached 2.3 GiB on the 548 MB overtime demo. Size the worker service accordingly (at least 4 GiB).
 
 The two `.mp4` files in the folder are broadcast footage, not EDGE recordings. They were not used.
 
@@ -125,7 +139,7 @@ Payload size is about 4× above an ideal compact encoding: JSON with 0.1-unit qu
 | # | Item | Blocker / next step |
 | --- | --- | --- |
 | 1 | Reference audit (all "needs reference access" rows) | Full-access EDGE account or owner recordings. Fill observation date, tier and steps per row |
-| 2 | Real-demo comparison with the reference | **Real demos now parse** (11/11). Still needed: an overtime demo (none of the 11 went to OT), and the same demos opened in EDGE to compare. Run `awpy_source.load` and compare rounds, scores, sides, event ticks and positions with the reference |
+| 2 | Real-demo comparison with the reference | **Real demos now parse** (11/11). Overtime is now covered (FURIA vs Falcons, 16–14). Still needed: the same demos opened in EDGE to compare. Run `awpy_source.load` and compare rounds, scores, sides, event ticks and positions with the reference |
 | 3 | Awpy adapter on real files | Column mapping follows the 3.3.0 guide. Check `bombsite`, grenade `type` values, raw `*_detonate` fields and `player_disconnect.xuid` |
 | 4 | Parser memory cap | `WORKER_PARSE_MEMORY_BYTES` uses `RLIMIT_AS` (virtual memory). Confirm it does not kill a healthy Awpy parse, or set it to `0` and rely on the container limit |
 | 5 | Map calibration and radar assets | Three landmarks per floor for each release map. Cleared radar images or Matchframe-original radars. Nuke floor routes |
