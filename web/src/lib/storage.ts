@@ -119,14 +119,20 @@ class FsStorage implements Storage {
 
 // ---------------------------------------------------------------- s3 driver
 
+/**
+ * SDK v3 defaults to adding a CRC32 checksum parameter to presigned PUT URLs, computed over an
+ * empty body, which S3-compatible stores then reject. Only send checksums when an operation requires them.
+ */
+const CHECKSUMS = { requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED" } as const;
+
 class S3Storage implements Storage {
   private clientPromise = (async () => {
     const { S3Client } = await import("@aws-sdk/client-s3");
-    return new S3Client({ region: env.s3Region, endpoint: env.s3Endpoint, forcePathStyle: true });
+    return new S3Client({ region: env.s3Region, endpoint: env.s3Endpoint, forcePathStyle: true, ...CHECKSUMS });
   })();
   private publicClientPromise = (async () => {
     const { S3Client } = await import("@aws-sdk/client-s3");
-    return new S3Client({ region: env.s3Region, endpoint: env.s3PublicEndpoint, forcePathStyle: true });
+    return new S3Client({ region: env.s3Region, endpoint: env.s3PublicEndpoint, forcePathStyle: true, ...CHECKSUMS });
   })();
 
   async createUploadTarget(key: string, size: number, _max: number, contentType: string): Promise<UploadTarget> {

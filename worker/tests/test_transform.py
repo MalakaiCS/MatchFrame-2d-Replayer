@@ -86,6 +86,12 @@ def test_events_sorted_with_deterministic_order(mirage):
         assert len({e["id"] for e in p["events"]}) == len(p["events"])
 
 
+def test_inventory_changes_ordered_by_tick(mirage):
+    for p in mirage.payloads.values():
+        ticks = [c["tick"] for c in p["inventory"]]
+        assert ticks == sorted(ticks)
+
+
 def test_kills_have_actor_target_and_position(mirage):
     kills = [e for p in mirage.payloads.values() for e in p["events"] if e["type"] == "kill"]
     assert kills

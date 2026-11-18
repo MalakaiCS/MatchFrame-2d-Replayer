@@ -839,6 +839,7 @@ def _round_payload(
         g.pop("_linked", None)
     grenades.sort(key=lambda g: (g["throwTick"], g["id"]))
     effects.sort(key=lambda e: (e["startTick"], e["id"]))
+    inventory.sort(key=lambda c: (c["tick"], c["playerId"]))
 
     payload = {
         "schemaVersion": SCHEMA_VERSION,

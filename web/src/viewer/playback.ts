@@ -215,9 +215,14 @@ export function frameAt(idx: RoundIndex, tick: number): Frame {
 /** Inventory at a tick: last recorded change per player. */
 export function inventoryAt(p: RoundPayload, tick: number): Map<string, string[]> {
   const m = new Map<string, string[]>();
+  // Ordered by tick in schema v1 payloads; do not rely on it (older payloads grouped by player).
+  const at = new Map<string, number>();
   for (const c of p.inventory) {
-    if (c.tick > tick) break;
-    m.set(c.playerId, c.items);
+    if (c.tick > tick) continue;
+    if ((at.get(c.playerId) ?? -Infinity) <= c.tick) {
+      at.set(c.playerId, c.tick);
+      m.set(c.playerId, c.items);
+    }
   }
   return m;
 }

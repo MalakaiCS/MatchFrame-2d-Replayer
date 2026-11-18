@@ -94,9 +94,10 @@ describe("players", () => {
     expect(lerpYaw(10, 30, 0.5)).toBeCloseTo(20, 5);
   });
 
-  it("reports inventory at a tick", () => {
-    const inv = inventoryAt(r05, r05.endTick - 1);
-    expect(inv.size).toBeGreaterThan(0);
+  it("reports inventory at a tick for every sampled player", () => {
+    const inv = inventoryAt(r05, r05.startTick + 64);
+    const sampled = r05.tracks.filter((t) => t.t[0] <= r05.startTick + 64).length;
+    expect(inv.size).toBe(sampled);
   });
 });
 

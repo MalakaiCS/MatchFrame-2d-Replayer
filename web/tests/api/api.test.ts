@@ -44,13 +44,15 @@ class Client {
   }
 }
 
+const abs = (u: string) => (/^https?:/.test(u) ? u : BASE + u);
+
 function synthetic(params: Record<string, unknown>) {
   return Buffer.concat([Buffer.from("MFSYNTH1"), Buffer.from(JSON.stringify(params))]);
 }
 
 async function upload(c: Client, data: Buffer, filename = "match.dem", extra: Record<string, unknown> = {}) {
   const slot = await c.json("/api/uploads", { method: "POST", json: { filename, size: data.length } }, 201);
-  const put = await fetch(BASE + slot.upload.url, { method: "PUT", body: new Uint8Array(data), headers: slot.upload.headers });
+  const put = await fetch(abs(slot.upload.url), { method: "PUT", body: new Uint8Array(data), headers: slot.upload.headers });
   expect(put.status).toBe(200);
   return { slot, done: await c.json(`/api/uploads/${slot.uploadId}/complete`, { method: "POST", json: extra }) };
 }
@@ -109,15 +111,22 @@ describe("upload and processing", () => {
     expect(gz.error.code).toBe("COMPRESSED_ARCHIVE");
     const bad = Buffer.from("this is not a demo file at all");
     const slot = await owner.json("/api/uploads", { method: "POST", json: { filename: "bad.dem", size: bad.length } }, 201);
-    await fetch(BASE + slot.upload.url, { method: "PUT", body: new Uint8Array(bad), headers: slot.upload.headers });
+    await fetch(abs(slot.upload.url), { method: "PUT", body: new Uint8Array(bad), headers: slot.upload.headers });
     const r = await owner.json(`/api/uploads/${slot.uploadId}/complete`, { method: "POST", json: {} }, 400);
     expect(r.error.code).toBe("INVALID_DEMO");
   });
 
   it("rejects a body that does not match the declared size", async () => {
     const slot = await owner.json("/api/uploads", { method: "POST", json: { filename: "a.dem", size: 50 } }, 201);
-    const put = await fetch(BASE + slot.upload.url, { method: "PUT", body: new Uint8Array(80), headers: slot.upload.headers });
-    expect(put.status).toBe(400);
+    const put = await fetch(abs(slot.upload.url), { method: "PUT", body: new Uint8Array(80), headers: slot.upload.headers });
+    // fs driver: the upload route refuses it. S3: the signed Content-Length makes the bucket refuse it
+    // (emulators may not enforce this). Either way, finalisation must reject the size mismatch.
+    if (put.ok) {
+      const r = await owner.json(`/api/uploads/${slot.uploadId}/complete`, { method: "POST", json: {} }, 400);
+      expect(r.error.code).toBe("SIZE_MISMATCH");
+    } else {
+      expect(put.status).toBeGreaterThanOrEqual(400);
+    }
   });
 
   it("reports unsupported maps as a failed replay", async () => {
@@ -288,7 +297,7 @@ describe("voice comms", () => {
   it("uploads an MP3 privately and streams with range support", async () => {
     const slot = await owner.json(`/api/replays/${replayId}/audio`, { method: "POST", json: { filename: "comms.mp3", size: mp3.length, label: "Team comms", offsetMs: 1500 } }, 201);
     track = slot.trackId;
-    await fetch(BASE + slot.upload.url, { method: "PUT", body: new Uint8Array(mp3), headers: slot.upload.headers });
+    await fetch(abs(slot.upload.url), { method: "PUT", body: new Uint8Array(mp3), headers: slot.upload.headers });
     await owner.json(`/api/replays/${replayId}/audio/${track}/complete`, { method: "POST" }, 200);
     const list = await owner.json(`/api/replays/${replayId}/audio`);
     expect(list.tracks[0].offsetMs).toBe(1500);

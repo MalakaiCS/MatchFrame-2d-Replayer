@@ -18,6 +18,8 @@ export function authOptions(): BetterAuthOptions {
     account: { modelName: "auth_account" },
     verification: { modelName: "auth_verification" },
     advanced: { database: { generateId: () => crypto.randomUUID() } },
+    // Built-in per-instance rate limiting stays on in production; AUTH_RATE_LIMIT=0 is for test environments only.
+    rateLimit: { enabled: process.env.AUTH_RATE_LIMIT === "0" ? false : undefined },
     plugins: [nextCookies()],
   };
 }
