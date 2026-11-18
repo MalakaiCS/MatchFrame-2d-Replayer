@@ -8,8 +8,8 @@ No row is "verified". No material workflow has been compared against the referen
 | Item | Value |
 | --- | --- |
 | Reference product | Skybox EDGE 2D Replayer, full-access tier |
-| Reference observation date | **None yet**: no reference session has taken place |
-| Reference tier observed | **None**: no authorised account, recordings or walkthroughs were provided |
+| Reference observation date | 2026-11-18: one owner-provided screenshot of the EDGE team overview page (see "Reference observations"). **The 2D Replayer itself has not been observed** |
+| Reference tier observed | Screenshot shows a "Get Free Trial / Enjoy the Pro membership" prompt, so it is **probably not the full-access tier**. Unconfirmed |
 | Public sources consulted | The brief's summary of the official EDGE page and Skybox pricing. `skybox.gg` was **unreachable** from the build sandbox on 2026-11-18 (HTTP connect failed), so the public pages have not been re-read first-hand |
 | Fixtures used | Deterministic **SYNTHETIC** match generator (`worker/matchframe_worker/synthetic.py`) on Mirage, Dust II and Nuke. **No real CS2 demo was available**: public demo hosts were blocked from the sandbox, and none was supplied |
 | Parser | Awpy 3.3.0 (pinned). Column mapping is taken from the Awpy 3.3.0 dataset guide in its source distribution, not from a real demo run |
@@ -172,6 +172,35 @@ The release map list depends on the reference audit. All values are in `web/src/
 | A11Y-04 | Narrow screens | Map and playback stay visible. Round and filter strip collapsible | Matchframe product choice (brief) | done | `viewer.spec.ts` "narrow screen": pass |
 | STATE-01 | Empty and error states | Library empty, catalogue empty, no rounds match, round load failure with retry, processing, failed with re-upload, revoked link | Matchframe product choice | done | `api.test.ts`, `viewer.spec.ts`: pass |
 
+## Reference observations
+
+Screenshots are used only to identify functionality. Nothing from their layout, styling or assets is copied.
+
+### OBS-SHOT-01: EDGE team overview (owner screenshot, 2026-11-18, probably not the full-access tier)
+
+Functional observations (text only):
+
+- **Navigation**: Games → Matches; 2D Tools → 2D Replayer; Statistics → Player Stats, Leaderboards. A "Demo" button with an upload icon sits at the bottom of the sidebar, which is probably the demo upload entry point.
+- **Steam integration banner**: "Connect your Steam account and enter your sharecode and authentication code to get matches fetched automatically", with a "Connect Steam" action. This suggests EDGE can import the user's own matchmaking demos automatically.
+- **Team overview filters**:
+  - Team selector, with a player-count chip ("8").
+  - Map scope ("All maps") and side ("Both sides / CT / T").
+  - Time window ("3 months") and sample size ("100 matches").
+  - Own buy type ("All buys") and opponent buy type ("All buys", marked "OPP"), plus a generic "Filters" menu.
+  - A copy-link button.
+- **Comparison and summary**: "Comparing To" with a team set and "Edit Comparison". Totals for maps (59) and rounds (1308), and "Show Matches".
+- **Per-map cards**: win rate, map count, recent results dots, 1st-pick and decider win rates, and 1st-pick, ban and played counts.
+- **Per-player cards**: T and CT role labels (Pack, Lurk, Anchor, Rotation) with info and stat icons.
+
+Scope assessment:
+
+- The overview, statistics and leaderboard pages are **outside the 2D Replayer boundary** (team scouting and statistics) and are not planned.
+- Two leads are relevant to the replayer and are added below as rows needing reference access: the Steam auto-import, and the own/opponent buy-type split for round filters.
+
 ## Features found in the reference but missing from the brief
 
-None recorded: the reference has not been observed.
+| ID | Feature | Source | Evidence | Impl. | Open question |
+| --- | --- | --- | --- | --- | --- |
+| NEW-01 | Automatic match import via Steam (sharecode + game authentication code) | OBS-SHOT-01 banner | needs reference access | not started | Is this part of the 2D Replayer workflow or a platform feature? It needs Valve match-history API access and demo download from Valve replay servers |
+| NEW-02 | Separate own vs opponent buy-type filters | OBS-SHOT-01 filter bar ("All buys", "OPP All buys") | needs reference access | partial: the round filters already pick the team for the buy filter (`buyTeam`) but cannot set both teams independently | Does the 2D Replayer's round list expose own and opponent buy filters? What buy categories does it list? |
+| NEW-03 | Copy-link button on filtered views | OBS-SHOT-01 link icon | needs reference access | done for the replayer (filters are kept in `?f=` and the moment in `?r=&t=`) | Does the replayer's link carry filters? |
