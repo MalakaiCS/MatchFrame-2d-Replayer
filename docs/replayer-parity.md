@@ -14,6 +14,7 @@ No row is "verified". No material workflow has been compared against the referen
 | Fixtures used | Deterministic **SYNTHETIC** match generator (`worker/matchframe_worker/synthetic.py`) on Mirage, Dust II and Nuke. **No real CS2 demo was available**: public demo hosts were blocked from the sandbox, and none was supplied |
 | Parser | Awpy 3.3.0 (pinned). Column mapping is taken from the Awpy 3.3.0 dataset guide in its source distribution, not from a real demo run |
 | Matrix last updated | 2026-11-18 |
+| Owner scope decisions (2026-11-18) | POV demos are out of scope; a voice-comms sample recording with a known sync point is not required |
 
 ### Evidence categories
 
@@ -31,9 +32,8 @@ No row is "verified". No material workflow has been compared against the referen
 ### What is needed to close the audit
 
 1. An authorised full-access EDGE account, or owner-provided screen recordings and walkthroughs, covering each row's "Open question".
-2. At least three permitted real CS2 demos: one GOTV on each of Mirage, Dust II and Nuke. Also wanted: one with overtime, one scrim, one POV, and one public-catalogue demo. Run each through both viewers.
+2. At least three permitted real CS2 demos: one GOTV on each of Mirage, Dust II and Nuke. Also wanted: one with overtime, one scrim, and one public-catalogue demo. Run each through both viewers.
 3. Radar images cleared for redistribution (or Matchframe-original radars), plus three landmark coordinates per floor for each released map.
-4. A sample voice-comms MP3 with a known sync point for one of those demos.
 
 ---
 
@@ -46,7 +46,7 @@ No row is "verified". No material workflow has been compared against the referen
 | OPEN-03 | Compressed archives | Not observed | Rejected with "Extract the archive and upload the .dem file" | `.gz/.bz2/.zip/.rar/.7z/.xz/.zst` | Matchframe product choice | done | `test_header.py`, `api.test.ts`: pass | pending | Does the reference accept archives? If yes, add server-side extraction with bounded decompression |
 | OPEN-04 | CS:GO (Source 1) demo | Not observed | Rejected: "This is a CS:GO demo" (`LEGACY_DEMO`) | `HL2DEMO` header | Matchframe product choice | done | `test_header.py`, `test_jobs.py`: pass | pending | Does the reference support CS:GO? (Out of scope unless verified) |
 | OPEN-05 | Invalid or corrupt demo | Not observed | Finalise rejects files without the `PBDEMS2` header. Parser failures become `PARSE_ERROR` and are not retried | all | Matchframe product choice | done | `api.test.ts`, `test_jobs.py`: pass | pending | Reference error wording and recovery path |
-| OPEN-06 | POV demo | Not observed | Opens with "POV · partial coverage" badge. Players without samples are shown as "unknown" | POV recordings | publicly described | partial | `test_transform.py::test_pov_partial_coverage` (synthetic): pass | pending | **No real POV demo tested.** GOTV/POV detection uses the header `client_name`; verify on real files |
+| OPEN-06 | POV demo | n/a | **Out of scope (owner decision, 2026-11-18).** Existing POV handling (partial-coverage badge, unknown players) is kept but not validated or required for release | POV recordings | Matchframe product choice | partial (not required) | `test_transform.py::test_pov_partial_coverage` (synthetic): pass | n/a | n/a |
 | OPEN-07 | Duplicate finalisation | n/a | The second call returns the same replay. One job only | all | Matchframe product choice | done | `api.test.ts` "finalisation is idempotent"; `test_jobs.py::test_duplicate_enqueue_is_idempotent`: pass | n/a | n/a |
 | OPEN-08 | Source expiry and re-upload | n/a | The source is deleted after a successful parse. Failed or pending sources expire (default 3 days). `SOURCE_MISSING` shows a re-upload path | all | Matchframe product choice | done | `test_jobs.py::test_missing_source_asks_for_reupload`: pass | n/a | n/a |
 | OPEN-09 | Multipart demos | Not observed | Not supported | n/a | needs reference access | not started | n/a | pending | Does EDGE join split recordings? (Awpy 3.3.0 supports multipart input) |
@@ -137,7 +137,7 @@ No row is "verified". No material workflow has been compared against the referen
 | ID | Feature | Reference source / observed steps | Expected result | Conditions | Evidence | Impl. | Test | Ref. compare | Open question |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | AUD-01 | Upload MP3 | Not observed | MP3 only (ID3 or MPEG frame header), ≤300 MiB, private storage | all | publicly described (voice comm integration) | done | `api.test.ts` "voice comms": pass | pending | **Reference accepted formats**; multiple tracks or channels? |
-| AUD-02 | Sync to the playhead | n/a | The replay is the master clock. Audio time = (tick × tickInterval − offset). Drift tolerance 120 ms. Muted above 4×. Silent outside the recorded range | all | Matchframe product choice (brief) | done | `viewer.test.ts` "audio sync": pass | pending | **Drift not measured against a real recording with a known sync point** |
+| AUD-02 | Sync to the playhead | n/a | The replay is the master clock. Audio time = (tick × tickInterval − offset). Drift tolerance 120 ms. Muted above 4×. Silent outside the recorded range | all | Matchframe product choice (brief) | done | `viewer.test.ts` "audio sync": pass | n/a | A measured drift test on a real recording is **not required** (owner decision, 2026-11-18) |
 | AUD-03 | Alignment controls | Not observed | Offset nudges (±100 ms, ±1 s). "Align to this moment" from a typed audio time | all | needs reference access | done | Manual | pending | Reference alignment UI |
 | AUD-04 | Audio permissions | n/a | Uploader and track team only. Hidden from read-only links unless "Include in read-only links" is set. Stream URLs are short-lived and re-authorised on every range request | all | Matchframe product choice (brief) | done | `api.test.ts`: pass | n/a | n/a |
 

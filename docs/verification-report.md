@@ -7,7 +7,7 @@ Date: 2026-11-18 · Branch: `claude/ecstatic-dijkstra-eem8d7`
 **Functional parity with the Skybox EDGE 2D Replayer: NOT PASSED (pending).** The claim cannot be made yet:
 
 1. **No reference access.** No authorised EDGE account, recordings or walkthroughs were available, and `skybox.gg` was unreachable from the build environment. Every reference-dependent row in [`replayer-parity.md`](replayer-parity.md) is still "publicly described" or "needs reference access", and none is "verified".
-2. **No real CS2 demo.** Public demo sources were blocked and none was supplied. The Awpy adapter is written against the Awpy 3.3.0 dataset guide, but **it has not been run on a real `.dem`**. All end-to-end runs used the labelled SYNTHETIC fixture generator.
+2. **No real CS2 demo.** Public demo sources were blocked and none was supplied (GOTV demos only; POV is out of scope per owner decision). The Awpy adapter is written against the Awpy 3.3.0 dataset guide, but **it has not been run on a real `.dem`**. All end-to-end runs used the labelled SYNTHETIC fixture generator.
 3. **Not deployed.** There was no Railway or DNS access. [`railway.md`](railway.md) gives the exact steps, marked pending.
 
 The engineering vertical slice and the full workflow surface are implemented and pass their own tests on synthetic data. The parity audit, real-demo validation and deployment remain open.
@@ -60,9 +60,9 @@ Brief acceptance scenarios covered on **synthetic** data:
 Not covered:
 
 - Anything against the reference.
-- Any real demo, including real POV and catalogue demos.
+- Any real demo, including catalogue demos. (POV demos are out of scope, per owner.)
 - The "slow previous-round response" case. Stale fetches are aborted in code (`RoundCache.cancelExcept`), but no test throttles a single round.
-- Audio drift against a real recording.
+- Audio drift against a real recording (not required, per owner).
 
 ## Benchmark (synthetic, not representative of real-demo parsing)
 
@@ -94,14 +94,14 @@ Payload size is about 4× above an ideal compact encoding: JSON with 0.1-unit qu
 | # | Item | Blocker / next step |
 | --- | --- | --- |
 | 1 | Reference audit (all "needs reference access" rows) | Full-access EDGE account or owner recordings. Fill observation date, tier and steps per row |
-| 2 | Real-demo validation | Permitted GOTV demos (Mirage, Dust II, Nuke, one OT, one scrim) and one POV. Run `awpy_source.load` and compare rounds, scores, sides, event ticks and positions with the reference |
-| 3 | Awpy adapter on real files | Column mapping follows the 3.3.0 guide. Check `bombsite`, grenade `type` values, raw `*_detonate` fields, `player_disconnect.xuid` and the GOTV/POV detection from `client_name` |
+| 2 | Real-demo validation | Permitted GOTV demos (Mirage, Dust II, Nuke, one OT, one scrim). Run `awpy_source.load` and compare rounds, scores, sides, event ticks and positions with the reference |
+| 3 | Awpy adapter on real files | Column mapping follows the 3.3.0 guide. Check `bombsite`, grenade `type` values, raw `*_detonate` fields and `player_disconnect.xuid` |
 | 4 | Parser memory cap | `WORKER_PARSE_MEMORY_BYTES` uses `RLIMIT_AS` (virtual memory). Confirm it does not kill a healthy Awpy parse, or set it to `0` and rely on the container limit |
 | 5 | Map calibration and radar assets | Three landmarks per floor for each release map. Cleared radar images or Matchframe-original radars. Nuke floor routes |
 | 6 | Smoke disruption | Inferred from HE detonations only. Compare shape and duration with the reference on an observed example |
 | 7 | Map drawing / annotation tools | Not implemented: their existence and operations in the reference are unknown |
 | 8 | Catalogue content | No licensed feed (see [`catalogue.md`](catalogue.md)) |
-| 9 | Voice comms | Accepted formats, multi-track and channel behaviour, and alignment UI need the reference. Drift on a real recording with a known sync point is unmeasured |
+| 9 | Voice comms | Accepted formats, multi-track and channel behaviour, and alignment UI need the reference. (A measured drift test on a real recording is not required, per owner.) |
 | 10 | Playback defaults | Speeds, seek steps, shortcuts, autoplay and freeze-skip defaults need the reference |
 | 11 | Deployment | Railway project, private Postgres, bucket with CORS, the `2d.matchframe.tv` DNS records Railway issues, and HTTPS/CORS/share-origin checks ([`railway.md`](railway.md)) |
 | 12 | Account flows | No email provider is configured, so there is no email verification or password reset. Rate limiting is Better Auth's per-instance in-memory limiter |
