@@ -93,7 +93,7 @@ Findings:
   - The clock is a countdown from the demo's convars (MM: 20 s freeze, 115.2 s round, 40 s bomb).
 - **Buy classification** agrees with Awpy's own `round_economy` in 100% of 452 team-rounds (pistol = pistol, eco = eco, half buy = force, full buy = full).
 - **Nuke floors**: about 12% of samples are assigned to the lower floor. The viewer's "Lower floor" mode marks upper-floor players as off-floor with ↑.
-- **Calibration sanity check**: real-play position bounds fall inside the 1024 px image for every map. This is **not** the three-landmark verification, which still needs radar images.
+- **Radar calibration (2026-11-19, with radars installed)**: 99.91–100% of about 318,000 live-player positions from 7 real demos land on the radar's playable area (Mirage, Dust2, Inferno, Ancient, Anubis, Cache, and both Nuke floors at 100%). Registry values equal Valve's overview files. Tool: `worker/tools/radar_alignment.py`.
 - **Through the real app**: `.rar` Nuke (234 MB, 363 MB extracted) went from upload to ready in 23.7 s. `.dem.bz2` Mirage (259 MB, 361 MB extracted) took 43.3 s. Worker parse took about 15 s with a peak child RSS of about 911 MiB.
 - **Payload size** on real demos: median 130–197 KB per round (gzip). Time to interactive at 25 Mbps is estimated at under 0.5 s plus RTT, and still needs measuring on the deployed origin.
 

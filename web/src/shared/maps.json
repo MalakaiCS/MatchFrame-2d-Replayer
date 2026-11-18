@@ -1,50 +1,54 @@
 {
-  "registryVersion": "2026.11.2",
-  "notes": "World->radar transform: px = (x - originX) / scale, py = (originY - y) / scale, in original radar image pixels (imageSize x imageSize). Origin and scale are the published CS2 overview values for each map. Status 'calibrated-unverified' means the values are configured but have not yet passed the three-landmark-per-floor check (docs/replayer-parity.md, MAP-*). No radar images are shipped; see docs/assets-and-licences.md.",
+  "registryVersion": "2026.11.3",
+  "notes": "World->radar transform: px = (x - originX) / scale, py = (originY - y) / scale, in original radar image pixels (imageSize x imageSize). Origin and scale are the published CS2 overview values for each map. All origins/scales equal Valve's overview files. Status 'verified' = real-demo play-coverage check passed on every floor (worker/tools/radar_alignment.py); 'calibrated-unverified' = official values, no real demo checked yet. Radar images: web/public/radars (Valve assets via MurkyYT/cs2-map-icons, see docs/assets-and-licences.md).",
   "maps": {
     "de_mirage": {
       "displayName": "Mirage",
-      "status": "calibrated-unverified",
+      "status": "verified",
       "imageSize": 1024,
       "originX": -3230,
       "originY": 1713,
       "scale": 5.0,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "main",
           "label": "Main"
         }
       ],
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry",
+      "verification": "2026-11-19: 99.91% of 45,792 live-player positions from real GOTV demos land on the radar's playable area (worker/tools/radar_alignment.py)."
     },
     "de_dust2": {
       "displayName": "Dust II",
-      "status": "calibrated-unverified",
+      "status": "verified",
       "imageSize": 1024,
       "originX": -2476,
       "originY": 3239,
       "scale": 4.4,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "main",
           "label": "Main"
         }
       ],
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry",
+      "verification": "2026-11-19: 99.96% of 57,207 live-player positions from real GOTV demos land on the radar's playable area (worker/tools/radar_alignment.py)."
     },
     "de_nuke": {
       "displayName": "Nuke",
-      "status": "calibrated-unverified",
+      "status": "verified",
       "imageSize": 1024,
       "originX": -3453,
       "originY": 2887,
       "scale": 7.0,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "upper",
@@ -58,102 +62,119 @@
         }
       ],
       "floorUncertaintyBand": 40,
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry",
+      "verification": "2026-11-19: 100.00% of 48,441 (upper) / 100.00% of 5,663 (lower) live-player positions from real GOTV demos land on the radar's playable area (worker/tools/radar_alignment.py)."
     },
     "de_inferno": {
       "displayName": "Inferno",
-      "status": "calibrated-unverified",
+      "status": "verified",
       "imageSize": 1024,
       "originX": -2087,
       "originY": 3870,
       "scale": 4.9,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "main",
           "label": "Main"
         }
       ],
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry",
+      "verification": "2026-11-19: 99.96% of 47,324 live-player positions from real GOTV demos land on the radar's playable area (worker/tools/radar_alignment.py)."
     },
     "de_ancient": {
       "displayName": "Ancient",
-      "status": "calibrated-unverified",
+      "status": "verified",
       "imageSize": 1024,
       "originX": -2953,
       "originY": 2164,
       "scale": 5.0,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "main",
           "label": "Main"
         }
       ],
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry",
+      "verification": "2026-11-19: 99.96% of 38,732 live-player positions from real GOTV demos land on the radar's playable area (worker/tools/radar_alignment.py)."
     },
     "de_anubis": {
       "displayName": "Anubis",
-      "status": "calibrated-unverified",
+      "status": "verified",
       "imageSize": 1024,
       "originX": -2796,
       "originY": 3328,
       "scale": 5.22,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "main",
           "label": "Main"
         }
       ],
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry",
+      "verification": "2026-11-19: 100.00% of 28,677 live-player positions from real GOTV demos land on the radar's playable area (worker/tools/radar_alignment.py)."
     },
     "de_overpass": {
       "displayName": "Overpass",
-      "status": "unverified",
+      "status": "calibrated-unverified",
       "imageSize": 1024,
       "originX": -4831,
       "originY": 1781,
       "scale": 5.2,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "main",
           "label": "Main"
         }
       ],
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry"
     },
     "de_train": {
       "displayName": "Train",
-      "status": "unverified",
+      "status": "calibrated-unverified",
       "imageSize": 1024,
       "originX": -2308,
       "originY": 2078,
       "scale": 4.082077,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
-          "id": "main",
-          "label": "Main"
+          "id": "upper",
+          "label": "Upper"
+        },
+        {
+          "id": "lower",
+          "label": "Lower",
+          "zMax": -50,
+          "imageSuffix": "_lower"
         }
       ],
-      "landmarks": []
+      "landmarks": [],
+      "floorUncertaintyBand": 40,
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry"
     },
     "de_vertigo": {
       "displayName": "Vertigo",
-      "status": "unverified",
+      "status": "calibrated-unverified",
       "imageSize": 1024,
       "originX": -3168,
       "originY": 1762,
       "scale": 4.0,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "upper",
@@ -167,17 +188,18 @@
         }
       ],
       "floorUncertaintyBand": 40,
-      "landmarks": []
+      "landmarks": [],
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry"
     },
     "de_cache": {
       "displayName": "Cache",
-      "status": "calibrated-unverified",
+      "status": "verified",
       "imageSize": 1024,
       "originX": -2000,
       "originY": 3250,
       "scale": 5.5,
       "rotationDeg": 0,
-      "assetVersion": "none",
+      "assetVersion": "cs2-map-icons@d07a2907",
       "floors": [
         {
           "id": "main",
@@ -185,8 +207,8 @@
         }
       ],
       "landmarks": [],
-      "calibrationNote": "Published CS:GO Cache overview values; consistent with real CS2 player-position bounds from a 2026 tournament demo (x -1648..3172, y -1479..2249 \u2192 image px 64..940, 182..860). Landmark check pending."
+      "overviewSource": "Valve overview file (cs2-map-icons data/radar_info, commit d07a2907): pos_x/pos_y/scale match this entry",
+      "verification": "2026-11-19: 100.00% of 45,952 live-player positions from real GOTV demos land on the radar's playable area (worker/tools/radar_alignment.py)."
     }
-  },
-  "calibrationEvidence": "2026-11-19: player-position bounds from owner-supplied real demos fall inside the 1024px image for de_dust2, de_mirage, de_inferno, de_ancient, de_nuke, de_anubis, de_cache (sanity check, not a landmark verification)."
+  }
 }

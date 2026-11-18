@@ -39,7 +39,6 @@ Also the deterministic SYNTHETIC generator for edge cases. Demos are not committ
 
 1. An authorised full-access EDGE account, or owner-provided screen recordings and walkthroughs, covering each row's "Open question".
 2. At least three permitted real CS2 demos: one GOTV on each of Mirage, Dust II and Nuke. Also wanted: one with overtime, one scrim, and one public-catalogue demo. Run each through both viewers.
-3. Radar images cleared for redistribution (or Matchframe-original radars), plus three landmark coordinates per floor for each released map.
 
 ---
 
@@ -166,11 +165,11 @@ The release map list depends on the reference audit. All values are in `web/src/
 
 | ID | Map | Calibration | Landmark check (3 per floor) | Radar asset | Status / gap |
 | --- | --- | --- | --- | --- | --- |
-| MAP-01 | Mirage | Overview origin (−3230, 1713), scale 5.0 | **not done**; real-play bounds fall inside the image (px x 135–931, y 170–862) | none shipped (icon repo has no radars; see assets doc) | Fixture map. Gap: landmark verification and a cleared radar image |
-| MAP-02 | Dust II | (−2476, 3239), scale 4.4 | **not done** | none shipped | Fixture map. Same gaps |
-| MAP-03 | Nuke | (−3453, 2887), scale 7.0, lower floor z < −495 | **not done** (both floors) | none shipped | Fixture map. Gaps: landmarks, floor routes, radar images for both floors |
-| MAP-04 | Inferno, Ancient, Anubis, Cache | Registry values; real-play bounds inside the image on owner demos → status `calibrated-unverified`. Cache added 2026-11-19 (CS:GO overview values, consistent with CS2 play bounds) | not done | none | Parse and render on the grid; landmark check and radar images pending |
-| MAP-06 | Overpass, Train, Vertigo | Registry values, status `unverified` | not done | none | No real demo yet |
+| MAP-01 | Mirage | Official overview (−3230, 1713), scale 5.0 | **verified**: 99.91% of 45,792 real positions on the playable area | shipped (cs2-map-icons) | Done |
+| MAP-02 | Dust II | Official overview (−2476, 3239), scale 4.4 | **verified**: 99.96% of 57,207 | shipped | Done |
+| MAP-03 | Nuke | Official overview (−3453, 2887), scale 7.0; lower floor z < −495 (official vertical sections) | **verified on both floors**: upper 100.00% of 48,441; lower 100.00% of 5,663 | shipped (upper + lower) | Done |
+| MAP-04 | Inferno, Ancient, Anubis, Cache | Official overview values | **verified**: 99.96% / 99.96% / 100.00% / 100.00% of 47,324 / 38,732 / 28,677 / 45,952 | shipped | Done |
+| MAP-06 | Overpass, Train, Vertigo | Official overview values; Train lower floor z < −50 and Vertigo lower floor z < 11700 (official vertical sections) | not yet: no real demo on these maps | shipped (incl. lower floors) | Needs one real demo per map |
 | MAP-05 | Reference map list | Not observed | n/a | n/a | needs reference access: which maps does EDGE support? |
 
 ## 12. Accessibility and states
