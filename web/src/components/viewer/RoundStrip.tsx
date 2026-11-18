@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Manifest, RoundSummary, TeamKey } from "@/shared/contract";
-import { type BuyOption, EMPTY_FILTERS, isEmpty, type RoundFilters, type RoundKind } from "@/viewer/filters";
+import { BUY_LABELS, BUY_OPTIONS, EMPTY_FILTERS, isEmpty, type RoundFilters, type RoundKind } from "@/viewer/filters";
 
 const REASON: Record<string, string> = {
   bomb_exploded: "bomb exploded", target_bombed: "bomb exploded", bomb_defused: "bomb defused",
@@ -66,9 +66,8 @@ export function RoundStrip({
               <option value="A">{t.A.name}</option>
               <option value="B">{t.B.name}</option>
             </select>
-            {(["eco", "semi_eco", "semi_buy", "full", "unknown"] as BuyOption[]).map((b) =>
-              chip(filters.buy.includes(b), () => setFilters({ ...filters, buy: toggle(filters.buy, b) }),
-                { eco: "Eco", semi_eco: "Semi-eco", semi_buy: "Semi-buy", full: "Full buy", unknown: "Unknown" }[b]))}
+            {BUY_OPTIONS.map((b) =>
+              chip(filters.buy.includes(b), () => setFilters({ ...filters, buy: toggle(filters.buy, b) }), BUY_LABELS[b]))}
           </fieldset>
           <fieldset>
             <legend>Side</legend>

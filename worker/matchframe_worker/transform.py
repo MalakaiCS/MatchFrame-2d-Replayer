@@ -36,9 +36,9 @@ class TransformConfig:
     default_max_rounds: int = 24
     default_ot_max_rounds: int = 6
     # Team buy classification by team equipment value at freeze end (USD). See docs/data-contract.md.
+    # Categories follow the reference: pistol / eco / half buy / full buy.
     eco_below: int = 5000
-    semi_eco_below: int = 10000
-    semi_buy_below: int = 20000
+    half_buy_below: int = 20000
     # Movement discontinuities.
     max_gap_samples: int = 2
     teleport_speed_ups: float = 1200.0
@@ -116,11 +116,9 @@ def classify_buy(value: int | None, is_pistol: bool, cfg: TransformConfig) -> st
         return None
     if value < cfg.eco_below:
         return "eco"
-    if value < cfg.semi_eco_below:
-        return "semi_eco"
-    if value < cfg.semi_buy_below:
-        return "semi_buy"
-    return "full"
+    if value < cfg.half_buy_below:
+        return "half_buy"
+    return "full_buy"
 
 
 def _has_firearm(items: Iterable[str] | None) -> bool:

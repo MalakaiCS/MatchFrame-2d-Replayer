@@ -8,10 +8,14 @@
  *   unknown equipment value match only the "unknown" buy option.
  * - Results keep the original RoundSummary objects (ids, display numbers, ticks, scores).
  */
-import type { BuyType, RoundSummary, Side, TeamKey } from "@/shared/contract";
+import { type BuyType, normalizeBuyType, type RoundSummary, type Side, type TeamKey } from "@/shared/contract";
 
 export type RoundKind = "pistol" | "gun";
 export type BuyOption = Exclude<BuyType, "pistol"> | "unknown";
+
+/** Buy filter options in display order. Pistol rounds are filtered by round type, not buy. */
+export const BUY_OPTIONS: BuyOption[] = ["eco", "half_buy", "full_buy", "unknown"];
+export const BUY_LABELS: Record<BuyOption, string> = { eco: "Eco", half_buy: "Half buy", full_buy: "Full buy", unknown: "Unknown" };
 
 export interface RoundFilters {
   kind: RoundKind[];
@@ -32,7 +36,7 @@ export function isEmpty(f: RoundFilters): boolean {
 }
 
 function buyMatches(r: RoundSummary, team: TeamKey, opts: BuyOption[]): boolean {
-  const bt = r.economy[team].buyType;
+  const bt = normalizeBuyType(r.economy[team].buyType);
   if (bt === "pistol") return false;
   if (bt === null) return opts.includes("unknown");
   return opts.includes(bt);
@@ -80,7 +84,7 @@ export function filtersFromParam(s: string | null): RoundFilters {
     const [k, v = ""] = part.split(":");
     const list = v.split(",").filter(Boolean);
     if (k === "k") f.kind = list.filter((x): x is RoundKind => x === "pistol" || x === "gun");
-    if (k === "b") f.buy = list.filter((x): x is BuyOption => ["eco", "semi_eco", "semi_buy", "full", "unknown"].includes(x));
+    if (k === "b") f.buy = list.filter((x): x is BuyOption => BUY_OPTIONS.includes(x as BuyOption));
     if (k === "bt" && (v === "A" || v === "B" || v === "either")) f.buyTeam = v;
     if (k === "s" && /^(A|B)(CT|T)$/.test(v)) f.side = { team: v[0] as TeamKey, side: v.slice(1) as Side };
     if (k === "w") f.winner = list.filter((x): x is TeamKey => x === "A" || x === "B");

@@ -3,7 +3,7 @@ import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import type { Manifest, RoundPayload } from "@/shared/contract";
-import { roundMsToTick, tickToRoundMs } from "@/shared/contract";
+import { normalizeBuyType, roundMsToTick, tickToRoundMs } from "@/shared/contract";
 import { audioTimeFor, decide, DRIFT_TOLERANCE_S } from "@/viewer/audioSync";
 import { clockAt, formatMs } from "@/viewer/clock";
 import { EMPTY_FILTERS, filterRounds, filtersFromParam, filtersToParam, type RoundFilters } from "@/viewer/filters";
@@ -125,8 +125,9 @@ describe("round filters", () => {
   it("combines categories with AND and options with OR", () => {
     const res = filterRounds(rounds, f({ kind: ["gun"], winner: ["A"], side: { team: "A", side: "CT" } }));
     expect(res.every((r) => !r.isPistol && r.winner === "A" && r.sides.A === "CT")).toBe(true);
-    const either = filterRounds(rounds, f({ buy: ["eco", "full"], buyTeam: "B" }));
-    expect(either.every((r) => ["eco", "full"].includes(r.economy.B.buyType!))).toBe(true);
+    const either = filterRounds(rounds, f({ buy: ["eco", "full_buy"], buyTeam: "B" }));
+    expect(either.length).toBeGreaterThan(0);
+    expect(either.every((r) => ["eco", "full_buy"].includes(normalizeBuyType(r.economy.B.buyType)!))).toBe(true);
   });
   it("overtime and empty results", () => {
     expect(filterRounds(rounds, f({ overtime: "only" })).map((r) => r.displayNumber)).toEqual([25, 26, 27, 28, 29]);
@@ -134,11 +135,20 @@ describe("round filters", () => {
   });
   it("unknown economy only matches the unknown option", () => {
     const unknown = rounds.map((r) => ({ ...r, economy: { A: { ...r.economy.A, buyType: r.isPistol ? "pistol" as const : null, equipmentValue: null }, B: r.economy.B } }));
-    expect(filterRounds(unknown, f({ buy: ["full"], buyTeam: "A" }))).toEqual([]);
+    expect(filterRounds(unknown, f({ buy: ["full_buy"], buyTeam: "A" }))).toEqual([]);
     expect(filterRounds(unknown, f({ buy: ["unknown"], buyTeam: "A" }))).toHaveLength(27);
   });
+  it("maps buy types from older replays to the current categories", () => {
+    expect(normalizeBuyType("semi_eco")).toBe("half_buy");
+    expect(normalizeBuyType("semi_buy")).toBe("half_buy");
+    expect(normalizeBuyType("full")).toBe("full_buy");
+    expect(normalizeBuyType("pistol")).toBe("pistol");
+    expect(normalizeBuyType(null)).toBeNull();
+    const legacy = rounds.map((r) => ({ ...r, economy: { ...r.economy, A: { ...r.economy.A, buyType: (r.isPistol ? "pistol" : "semi_buy") as never } } }));
+    expect(filterRounds(legacy, f({ buy: ["half_buy"], buyTeam: "A" }))).toHaveLength(27);
+  });
   it("round-trips through the URL", () => {
-    const x = f({ kind: ["gun"], buy: ["eco", "unknown"], buyTeam: "A", side: { team: "B", side: "T" }, winner: ["B"], overtime: "exclude", bomb: "planted" });
+    const x = f({ kind: ["gun"], buy: ["half_buy", "unknown"], buyTeam: "A", side: { team: "B", side: "T" }, winner: ["B"], overtime: "exclude", bomb: "planted" });
     expect(filtersFromParam(filtersToParam(x))).toEqual(x);
     expect(filtersFromParam("garbage;;k:nope;s:ZZ")).toEqual(f({}));
   });

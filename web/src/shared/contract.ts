@@ -15,7 +15,15 @@ export const SCHEMA_VERSION = 1 as const;
 
 export type Side = "CT" | "T";
 export type TeamKey = "A" | "B";
-export type BuyType = "pistol" | "eco" | "semi_eco" | "semi_buy" | "full";
+export type BuyType = "pistol" | "eco" | "half_buy" | "full_buy";
+
+/** Replays processed before the category change used semi_eco / semi_buy / full; map them on read. */
+export function normalizeBuyType(v: string | null | undefined): BuyType | null {
+  if (v === null || v === undefined) return null;
+  if (v === "semi_eco" || v === "semi_buy" || v === "half" || v === "force") return "half_buy";
+  if (v === "full") return "full_buy";
+  return v === "pistol" || v === "eco" || v === "half_buy" || v === "full_buy" ? v : null;
+}
 
 export interface PlayerInfo {
   /** Replay-local stable ID: "s:<steamid64>" for humans, "b:<n>" for bots or ambiguous IDs. */

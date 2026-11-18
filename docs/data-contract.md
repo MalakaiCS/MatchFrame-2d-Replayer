@@ -32,7 +32,7 @@ Versions recorded per replay: schema version, parser name and version, worker ve
 
 - `isPistol`: regulation rounds `1` and `maxRounds/2 + 1`. Overtime rounds are never pistols. The first round of each overtime half is flagged `isOvertimeHalfStart`.
 - `economy[team].equipmentValue`: sum of `equipment_value` at the first sample at or after freeze end, or `null` when unavailable.
-- `economy[team].buyType`: `pistol` if a pistol round, otherwise by value: eco < $5,000; semi-eco < $10,000; semi-buy < $20,000; full ≥ $20,000. `null` when the value is unknown. The parser's own classification (Awpy: pistol/eco/force/full) is kept in `parserBuyType` for comparison.
+- `economy[team].buyType`: `pistol` if a pistol round, otherwise by value: `eco` < $5,000; `half_buy` $5,000–$19,999; `full_buy` ≥ $20,000 (categories set by the project owner to match the reference: Pistol, Eco, Half buy, Full buy). Replays processed earlier stored `semi_eco`/`semi_buy`/`full`; the viewer maps these to `half_buy`/`full_buy`. `null` when the value is unknown. The parser's own classification (Awpy: pistol/eco/force/full) is kept in `parserBuyType` for comparison.
 - `coverage[playerId]`: samples present ÷ samples expected for the round window. It is `0` for players with no samples, which is the normal case for POV demos.
 
 ## Round filters

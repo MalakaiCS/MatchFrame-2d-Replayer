@@ -64,9 +64,9 @@ def test_buy_thresholds():
     assert classify_buy(None, False, c) is None
     assert classify_buy(None, True, c) == "pistol"
     assert classify_buy(4999, False, c) == "eco"
-    assert classify_buy(5000, False, c) == "semi_eco"
-    assert classify_buy(10000, False, c) == "semi_buy"
-    assert classify_buy(20000, False, c) == "full"
+    assert classify_buy(5000, False, c) == "half_buy"
+    assert classify_buy(19999, False, c) == "half_buy"
+    assert classify_buy(20000, False, c) == "full_buy"
 
 
 def test_unknown_economy_keeps_pistol(mirage_raw):
