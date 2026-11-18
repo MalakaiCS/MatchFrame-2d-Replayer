@@ -6,6 +6,7 @@ import { formatMs } from "@/viewer/clock";
 import { FLAGS, type Frame } from "@/viewer/playback";
 import { api } from "../api";
 import { IconBookmark, IconEdit, IconFollow, IconNote, IconTrash } from "../icons";
+import { KillModifiers, WeaponIcon } from "./GameIcons";
 
 type PInfo = PlayerInfo & { side: Side };
 
@@ -66,12 +67,20 @@ export function PlayersPanel({
                   {known && caps.health && f?.hp != null ? <span className="hp"><div style={{ width: `${f.hp}%` }} /></span> : null}
                   {known ? (
                     <span className="player-sub">
-                      <span>{short(f?.weapon)}</span>
-                      {caps.armor && f?.armor ? <span>{f.flags & FLAGS.helmet ? "Kevlar+helmet" : "Kevlar"} {f.armor}</span> : null}
-                      {f && f.flags & FLAGS.defuser ? <span>Kit</span> : null}
-                      {f && f.flags & FLAGS.bomb ? <span style={{ color: "var(--danger)" }}>Bomb</span> : null}
+                      <span className="inv-icons"><WeaponIcon name={f?.weapon} height={16} label={`holding ${short(f?.weapon)}`} /></span>
+                      {caps.armor && f?.armor ? (
+                        <span className="inv-icons" title={`${f.flags & FLAGS.helmet ? "Kevlar + helmet" : "Kevlar"} ${f.armor}`}>
+                          <WeaponIcon name={f.flags & FLAGS.helmet ? "armor_helmet" : "armor"} label={f.flags & FLAGS.helmet ? "Kevlar and helmet" : "Kevlar"} /> {f.armor}
+                        </span>
+                      ) : null}
+                      {f && f.flags & FLAGS.defuser ? <WeaponIcon name="defuser" label="Defuse kit" /> : null}
+                      {f && f.flags & FLAGS.bomb ? <span className="inv-icons" style={{ color: "var(--danger)" }}><WeaponIcon name="c4" label="Bomb" /> Bomb</span> : null}
                       {caps.money && f?.money != null ? <span className="mono">${f.money}</span> : null}
-                      {caps.inventory && inv.length ? <span className="faint">{inv.map(short).join(", ")}</span> : null}
+                      {caps.inventory && inv.length ? (
+                        <span className="inv-icons faint" aria-label={`Inventory: ${inv.map(short).join(", ")}`}>
+                          {inv.filter((w) => !/knife|bayonet/i.test(w) || inv.length === 1).map((w, i) => <WeaponIcon key={`${w}-${i}`} name={w} height={12} />)}
+                        </span>
+                      ) : null}
                     </span>
                   ) : null}
                 </button>
@@ -141,7 +150,16 @@ export function EventsPanel({
         <button type="button" key={e.id} className="event-row" data-past={e.tick <= tick} onClick={() => onSeek(e.tick)}
           aria-label={`${formatMs((e.tick - base) * manifest.tickIntervalMs)}: ${describeEvent(e, name)}`}>
           <span className="event-time">{formatMs((e.tick - base) * manifest.tickIntervalMs)}</span>
-          <span>{describeEvent(e, name)}{e.provenance === "inferred" && e.type !== "smoke_disrupted" ? " (inferred)" : ""}</span>
+          {e.type === "kill" ? (
+            <span className="kill-line">
+              <span className={`side side-${players.get(e.actor ?? "")?.side ?? "CT"}`}>{name(e.actor)}</span>
+              <WeaponIcon name={e.weapon} height={14} />
+              <KillModifiers e={e} />
+              <span className={`side side-${players.get(e.target ?? "")?.side ?? "T"}`}>{name(e.target)}</span>
+            </span>
+          ) : (
+            <span>{describeEvent(e, name)}{e.provenance === "inferred" && e.type !== "smoke_disrupted" ? " (inferred)" : ""}</span>
+          )}
         </button>
       ))}
     </div>

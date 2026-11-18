@@ -19,6 +19,7 @@ import {
 } from "../icons";
 import { StatusBadge } from "../Library";
 import { CommsPanel } from "./CommsPanel";
+import { KillModifiers, WeaponIcon } from "./GameIcons";
 import { EventsPanel, PlayersPanel, PlaylistPanel, ReviewPanel, useReview } from "./panels";
 import { reasonText, RoundStrip } from "./RoundStrip";
 import { ShareDialog, ShortcutsDialog } from "./ShareDialog";
@@ -543,6 +544,7 @@ function Workspace({
                 </details>
               </div>
             </div>
+            {payload ? <KillFeed events={payload.events} tick={uiTick} windowTicks={Math.round(6 * manifest.tickRate)} players={players} /> : null}
             {!index && !roundError ? <div className="radar-note" role="status">Loading round {round.displayNumber}…</div> : null}
             {roundError ? <div className="radar-note alert-err" role="alert">{roundError} <button className="btn btn-sm" onClick={() => setRetry((n) => n + 1)}>Retry</button></div> : null}
             {index && !radarImgs.current.get(0) ? (
@@ -618,6 +620,28 @@ function Workspace({
       <ShareDialog open={shareOpen} onClose={() => { setShareOpen(false); reload(); }} replayId={id} roundId={round.id} roundMs={roundMs}
         isOwner={data.access.via === "owner"} viaShare={viaShare} teams={teams} replayTeamId={data.replay.teamId} visibility={data.replay.visibility} onChanged={reload} />
       <ShortcutsDialog open={kbdOpen} onClose={() => setKbdOpen(false)} />
+    </div>
+  );
+}
+
+/** In-radar kill feed: kills in the last few seconds of replay time, newest last. Deterministic for a tick. */
+function KillFeed({ events, tick, windowTicks, players }: {
+  events: import("@/shared/contract").GameEvent[]; tick: number; windowTicks: number; players: Map<string, PlayerInfo & { side: Side }>;
+}) {
+  const recent = events.filter((e) => e.type === "kill" && e.tick <= tick && e.tick > tick - windowTicks).slice(-5);
+  if (!recent.length) return null;
+  const nm = (id?: string | null) => (id ? players.get(id)?.name ?? "?" : "World");
+  const sd = (id?: string | null) => (id ? players.get(id)?.side ?? "CT" : "CT");
+  return (
+    <div className="killfeed" aria-hidden="true">
+      {recent.map((e) => (
+        <div key={e.id} className="killfeed-row" data-fresh={tick - e.tick < windowTicks / 3}>
+          {e.actor ? <span className={`side side-${sd(e.actor)}`}>{nm(e.actor)}</span> : null}
+          <WeaponIcon name={e.weapon} height={15} />
+          <KillModifiers e={e} height={14} />
+          <span className={`side side-${sd(e.target)}`}>{nm(e.target)}</span>
+        </div>
+      ))}
     </div>
   );
 }

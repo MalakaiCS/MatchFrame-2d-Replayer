@@ -95,7 +95,7 @@ No row is "verified". No material workflow has been compared against the referen
 | OBS-02 | Alive/dead | n/a | Dead from the recorded kill tick. The death marker (×) persists for the round | all | Matchframe product choice (brief) | done | `viewer.test.ts`: pass | pending | n/a |
 | OBS-03 | Selection and follow | Not observed | Click a marker or player row to select. "Follow selected player" centres the view | all | needs reference access | done | Manual | pending | Reference follow behaviour |
 | OBS-04 | Pan and zoom | Not observed | Drag, wheel zoom about the cursor, ± buttons, `0` / double-click reset | all | needs reference access | done | `viewer.test.ts` "zooming keeps the cursor point fixed": pass | pending | n/a |
-| OBS-05 | Player state fields | Not observed | HP, armour/helmet, kit, bomb, active weapon, money, inventory (when the demo provides them) | GOTV | needs reference access | done | Manual | pending | **Which fields does the reference display?** |
+| OBS-05 | Player state fields | Not observed | HP, armour/helmet, kit, bomb, active weapon, money, inventory (when the demo provides them), shown with CS2 equipment icons | GOTV | needs reference access | done | Manual | pending | **Which fields does the reference display?** |
 | OBS-06 | Bomb state | n/a | carried / dropped (with position) / planting / planted (site, position) / defusing / defused / exploded. Exact location is omitted when unrecorded | all | Matchframe product choice (brief) | done | `test_transform.py::test_bomb_lifecycle`, `viewer.test.ts`: pass (synthetic) | pending | Verify against a real demo; Awpy has no defuse-begin position |
 | OBS-07 | Multi-floor (Nuke) | n/a | Floor from the z threshold (`zMax −495` on Nuke) with a ±40-unit uncertainty band. Floor selector: other-floor players drawn hollow with ↑/↓ | Nuke, Vertigo | Matchframe product choice | partial | `test_transform.py::test_nuke_floors`, `viewer.test.ts`: pass | pending | **Thresholds unverified.** Validate routes between floors with real footage |
 
@@ -103,7 +103,7 @@ No row is "verified". No material workflow has been compared against the referen
 
 | ID | Feature | Reference source / observed steps | Expected result | Conditions | Evidence | Impl. | Test | Ref. compare | Open question |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| EVT-01 | Kill feed and click-to-seek | Not observed | Events tab and timeline markers. A click seeks to the recorded tick | all | needs reference access | done | `viewer.spec.ts` "kill click lands on the recorded tick": pass | pending | Event time alignment vs reference |
+| EVT-01 | Kill feed and click-to-seek | Not observed | In-radar kill feed (last 6 s of replay time, CS2 weapon and headshot/wallbang/smoke/blind/no-scope icons), Events tab and timeline markers. A click seeks to the recorded tick | all | needs reference access | done | `viewer.spec.ts` "kill click lands on the recorded tick": pass | pending | Event time alignment vs reference |
 | EVT-02 | Plant/defuse/explosion events | Not observed | Listed with site and actor | all | needs reference access | done | `test_transform.py`: pass | pending | n/a |
 | UTIL-01 | Grenade flight paths | Not observed | Recorded projectile positions only. Detonation-only grenades show no invented path | all | Matchframe product choice (brief) | done | `test_transform.py::test_detonation_only_fire_has_no_invented_path`: pass | pending | Reference grenade controls (filter by type/player?) |
 | UTIL-02 | Smoke and fire areas | n/a | Configured estimates (smoke r=144, fire r=150), dashed and labelled "est." | all | Matchframe product choice | done | `test_transform.py`: pass | pending | Reference area shapes |
@@ -156,7 +156,7 @@ The release map list depends on the reference audit. All values are in `web/src/
 
 | ID | Map | Calibration | Landmark check (3 per floor) | Radar asset | Status / gap |
 | --- | --- | --- | --- | --- | --- |
-| MAP-01 | Mirage | Overview origin (−3230, 1713), scale 5.0 | **not done** | none shipped | Fixture map. Gap: landmark verification and a cleared radar image |
+| MAP-01 | Mirage | Overview origin (−3230, 1713), scale 5.0 | **not done** | none shipped (icon repo has no radars; see assets doc) | Fixture map. Gap: landmark verification and a cleared radar image |
 | MAP-02 | Dust II | (−2476, 3239), scale 4.4 | **not done** | none shipped | Fixture map. Same gaps |
 | MAP-03 | Nuke | (−3453, 2887), scale 7.0, lower floor z < −495 | **not done** (both floors) | none shipped | Fixture map. Gaps: landmarks, floor routes, radar images for both floors |
 | MAP-04 | Inferno, Ancient, Anubis, Overpass, Train, Vertigo | Values in the registry, status `unverified` | not done | none | Parses and renders on the grid. Not part of the verified release list |

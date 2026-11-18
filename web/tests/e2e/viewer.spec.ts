@@ -61,7 +61,7 @@ test("viewer: kill click lands on the recorded tick; keyboard and filters", asyn
   const label = await marker.getAttribute("aria-label");
   await marker.click();
   await page.getByRole("tab", { name: "Events" }).click();
-  const killRow = page.locator(".event-row", { hasText: "killed" }).first();
+  const killRow = page.locator(".event-row[aria-label*=\"killed\"]").first();
   await expect(killRow).toBeVisible();
   const scrub = page.locator("#round-scrubber");
   const tickAfterMarker = await scrub.inputValue();

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatMs } from "@/viewer/clock";
-import { mapName } from "@/viewer/maps";
+import { MapTile } from "./Library";
 import { api, ApiError } from "./api";
 import { IconDown, IconEdit, IconPlay, IconTrash, IconUp } from "./icons";
 
@@ -114,7 +114,7 @@ export function PlaylistPage({ id }: { id: string }) {
         {entries.map((e, i) => (
           <li key={e.id} className="replay-item" style={{ gridTemplateColumns: "28px 96px 1fr auto", opacity: e.available ? 1 : 0.6 }}>
             <span className="mono faint">{i + 1}</span>
-            <div className="map-tile">{e.available ? mapName(e.mapId) : "—"}</div>
+            <MapTile mapId={e.available ? e.mapId : null} />
             <div style={{ minWidth: 0 }}>
               {e.available ? (
                 <>

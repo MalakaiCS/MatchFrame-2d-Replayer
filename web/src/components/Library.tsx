@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { mapIcon } from "@/viewer/icons";
 import { listMaps, mapName } from "@/viewer/maps";
 import { api, ApiError } from "./api";
 import { IconUpload } from "./icons";
@@ -44,6 +45,16 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   ready: { label: "Ready", cls: "badge-ok" },
   failed: { label: "Failed", cls: "badge-err" },
 };
+
+export function MapTile({ mapId }: { mapId: string | null | undefined }) {
+  const icon = mapIcon(mapId);
+  return (
+    <div className="map-tile">
+      {icon ? <img src={icon} alt="" /> : null}
+      <span>{mapId ? mapName(mapId) : "—"}</span>
+    </div>
+  );
+}
 
 export function StatusBadge({ status }: { status: string }) {
   const s = STATUS[status] ?? { label: status, cls: "" };
@@ -157,7 +168,7 @@ export function Library() {
           <div className="replay-list">
             {replays.map((r) => (
               <Link key={r.id} href={`/replays/${r.id}`} className="replay-item" aria-label={`${r.title ?? `${r.teamA ?? "Team A"} vs ${r.teamB ?? "Team B"}`}, ${mapName(r.mapId)}, ${r.status}`}>
-                <div className="map-tile">{r.mapId ? mapName(r.mapId) : "—"}</div>
+                <MapTile mapId={r.mapId} />
                 <div style={{ minWidth: 0 }}>
                   <div className="replay-title">
                     {r.title || (r.teamA ? `${r.teamA} vs ${r.teamB}` : r.sourceFilename ?? "Untitled demo")}
@@ -198,7 +209,7 @@ export function Library() {
             {catalogue.map((c) => {
               const inner = (
                 <>
-                  <div className="map-tile">{mapName(c.mapId)}</div>
+                  <MapTile mapId={c.mapId} />
                   <div style={{ minWidth: 0 }}>
                     <div className="replay-title">{c.matchName}{c.mapIndex ? ` · map ${c.mapIndex}` : ""}</div>
                     <div className="replay-meta">
