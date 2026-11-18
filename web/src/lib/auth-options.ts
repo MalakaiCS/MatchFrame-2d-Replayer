@@ -12,7 +12,7 @@ export function authOptions(): BetterAuthOptions {
     baseURL: process.env.APP_ORIGIN ?? "http://localhost:3000",
     secret: process.env.AUTH_SECRET,
     database: getPool(),
-    emailAndPassword: { enabled: true, minPasswordLength: 10, autoSignIn: true },
+    emailAndPassword: { enabled: true, minPasswordLength: 10, autoSignIn: true, disableSignUp: process.env.ALLOW_SIGNUP === "0" },
     user: { modelName: "auth_user" },
     session: { modelName: "auth_session", expiresIn: 60 * 60 * 24 * 14 },
     account: { modelName: "auth_account" },
