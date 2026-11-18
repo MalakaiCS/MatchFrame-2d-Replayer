@@ -107,8 +107,10 @@ describe("upload and processing", () => {
   it("rejects oversized, compressed and non-demo uploads with actionable errors", async () => {
     const big = await owner.json("/api/uploads", { method: "POST", json: { filename: "x.dem", size: 600 * 2 ** 20 } }, 400);
     expect(big.error.code).toBe("TOO_LARGE");
-    const gz = await owner.json("/api/uploads", { method: "POST", json: { filename: "x.dem.gz", size: 100 } }, 400);
-    expect(gz.error.code).toBe("COMPRESSED_ARCHIVE");
+    const sz = await owner.json("/api/uploads", { method: "POST", json: { filename: "x.7z", size: 100 } }, 400);
+    expect(sz.error.code).toBe("UNSUPPORTED_ARCHIVE");
+    // Compressed demos (.dem.bz2 / .dem.gz / .zip / .rar) are accepted and extracted by the worker.
+    await owner.json("/api/uploads", { method: "POST", json: { filename: "x.dem.bz2", size: 100 } }, 201);
     const bad = Buffer.from("this is not a demo file at all");
     const slot = await owner.json("/api/uploads", { method: "POST", json: { filename: "bad.dem", size: bad.length } }, 201);
     await fetch(abs(slot.upload.url), { method: "PUT", body: new Uint8Array(bad), headers: slot.upload.headers });

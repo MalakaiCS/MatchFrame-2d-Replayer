@@ -20,10 +20,9 @@ async function sniff(file: File): Promise<string | null> {
   const s = String.fromCharCode(...head);
   if (s === "PBDEMS2\0" || s === "MFSYNTH1") return null;
   if (s.startsWith("HL2DEMO")) return "This is a CS:GO demo. Only CS2 demos are supported.";
-  if (head[0] === 0x1f && head[1] === 0x8b) return "This is a gzip archive. Extract it and upload the .dem file.";
-  if (s.startsWith("PK")) return "This is a zip archive. Extract it and upload the .dem file.";
-  if (s.startsWith("BZh")) return "This is a bzip2 archive. Extract it and upload the .dem file.";
-  return "The file is not a CS2 demo (missing PBDEMS2 header).";
+  // Archives are extracted on the server; the demo inside is checked there.
+  if ((head[0] === 0x1f && head[1] === 0x8b) || s.startsWith("PK\x03\x04") || s.startsWith("BZh") || s.startsWith("Rar!")) return null;
+  return "The file is not a CS2 demo or a supported archive.";
 }
 
 export function UploadFlow() {
@@ -67,8 +66,7 @@ export function UploadFlow() {
     setFailure(null);
     if (!f) return;
     const lower = f.name.toLowerCase();
-    if (/\.(gz|bz2|zip|rar|7z|xz|zst)$/.test(lower)) return setError("Compressed archives are not accepted. Extract the archive and upload the .dem file.");
-    if (!lower.endsWith(".dem")) return setError("Choose a CS2 .dem file.");
+    if (!/\.(dem|bz2|gz|zip|rar)$/.test(lower)) return setError("Choose a CS2 demo: .dem, .dem.bz2, .dem.gz, .zip or .rar.");
     if (f.size > MAX_HINT * 2 ** 20) return setError(`The demo is ${(f.size / 2 ** 20).toFixed(0)} MiB; the limit is ${MAX_HINT} MiB.`);
     setStage("checking");
     const bad = await sniff(f);
@@ -114,7 +112,7 @@ export function UploadFlow() {
   return (
     <div className="page" style={{ maxWidth: 720 }}>
       <h1>Upload a demo</h1>
-      <p className="page-sub">CS2 GOTV or POV recordings, uncompressed <span className="mono">.dem</span>, up to {MAX_HINT} MiB. Uploads are private until you share them.</p>
+      <p className="page-sub">CS2 demos as <span className="mono">.dem</span>, or compressed as <span className="mono">.dem.bz2</span>, <span className="mono">.dem.gz</span>, <span className="mono">.zip</span> or <span className="mono">.rar</span> with one demo inside. Up to {MAX_HINT} MiB per upload. Uploads are private until you share them.</p>
 
       <div className="steps" aria-label="Progress">
         <span className="step" data-state={step(["uploading", "finalising"], ["processing", "ready"])}>1. Upload</span>
@@ -134,8 +132,8 @@ export function UploadFlow() {
             onDrop={(e) => { e.preventDefault(); setOver(false); void choose(e.dataTransfer.files[0]); }}
           >
             <IconUpload width={22} height={22} />
-            <p style={{ margin: "8px 0 0" }}>{file ? <><strong>{file.name}</strong> · {(file.size / 2 ** 20).toFixed(1)} MiB</> : "Drop a .dem file here, or click to choose"}</p>
-            <input ref={inputRef} type="file" accept=".dem" hidden onChange={(e) => void choose(e.target.files?.[0])} data-testid="file-input" />
+            <p style={{ margin: "8px 0 0" }}>{file ? <><strong>{file.name}</strong> · {(file.size / 2 ** 20).toFixed(1)} MiB</> : "Drop a demo or archive here, or click to choose"}</p>
+            <input ref={inputRef} type="file" accept=".dem,.bz2,.gz,.zip,.rar" hidden onChange={(e) => void choose(e.target.files?.[0])} data-testid="file-input" />
           </div>
           <div className="row wrap">
             <div className="field grow">

@@ -11,8 +11,14 @@ No row is "verified". No material workflow has been compared against the referen
 | Reference observation date | 2026-11-18/19: owner-provided screenshots (OBS-SHOT-01 to 06): team overview, match page, **one 2D Replayer view**, the replayer scoreboard with the setpos popover, player stats, and the tier table |
 | Reference tier observed | Every screenshot shows a "Get Free Trial / Enjoy the Pro membership" prompt, so this is **probably the Core 2D Replayer tier**, not Full access (tier table: Tier 3 = Core, Tier 2 = Advanced, Tier 1 = Full access). Advanced and Full-access replayer features remain unobserved |
 | Public sources consulted | The brief's summary of the official EDGE page and Skybox pricing. `skybox.gg` was **unreachable** from the build sandbox on 2026-11-18 (HTTP connect failed), so the public pages have not been re-read first-hand |
-| Fixtures used | Deterministic **SYNTHETIC** match generator (`worker/matchframe_worker/synthetic.py`) on Mirage, Dust II and Nuke. **No real CS2 demo was available**: public demo hosts were blocked from the sandbox, and none was supplied |
-| Parser | Awpy 3.3.0 (pinned). Column mapping is taken from the Awpy 3.3.0 dataset guide in its source distribution, not from a real demo run |
+| Fixtures used | **11 real CS2 demos** supplied by the owner (Google Drive, 2026-11-19), all GOTV/SourceTV:
+
+- 7 tournament demos (Digital Crusade S7) on Dust2, Mirage, Inferno, Ancient, Nuke, Cache and Anubis;
+- 1 scrim on Inferno;
+- 3 matchmaking demos on Mirage.
+
+Also the deterministic SYNTHETIC generator for edge cases. Demos are not committed; see `worker/tests/test_real_demos.py` |
+| Parser | Awpy 3.3.0 (pinned). Column mapping from the Awpy 3.3.0 dataset guide, **validated on the 11 real demos** (all parse; buy classes agree with Awpy's in 100% of team-rounds) |
 | Matrix last updated | 2026-11-18 |
 | Owner scope decisions (2026-11-18) | POV demos are out of scope; a voice-comms sample recording with a known sync point is not required |
 
@@ -41,9 +47,9 @@ No row is "verified". No material workflow has been compared against the referen
 
 | ID | Feature | Reference source / observed steps | Expected result | Conditions | Evidence | Impl. | Test | Ref. compare | Open question |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| OPEN-01 | Upload an uncompressed CS2 `.dem` | Not observed | Upload, processing and ready states shown; replay opens | GOTV demos | publicly described (public and POV demos) | done | `api.test.ts` "upload and processing"; `viewer.spec.ts` "sign up, upload and process" (synthetic): pass | pending | Which formats does EDGE accept (`.dem` only, `.dem.gz`, `.zip`, `.bz2`)? What is the size limit? |
+| OPEN-01 | Upload a CS2 demo | Not observed | Upload, processing and ready states shown; replay opens | GOTV demos | publicly described (public and POV demos) | done | `api.test.ts`, `viewer.spec.ts` (synthetic); **real `.rar` (Nuke, 234 MB → ready in 23.7 s) and `.dem.bz2` (Mirage MM, 259 MB → 43.3 s) uploaded through the UI**: pass | pending | Which formats does EDGE accept (`.dem` only, `.dem.gz`, `.zip`, `.bz2`)? What is the size limit? |
 | OPEN-02 | Size limit | Not observed | Configurable cap, default 512 MiB (`MAX_DEMO_BYTES`). Rejected before upload with the size in MiB | all | Matchframe product choice (brief default) | done | `api.test.ts` "rejects oversized…": pass | pending | The reference limit |
-| OPEN-03 | Compressed archives | Not observed | Rejected with "Extract the archive and upload the .dem file" | `.gz/.bz2/.zip/.rar/.7z/.xz/.zst` | Matchframe product choice | done | `test_header.py`, `api.test.ts`: pass | pending | Does the reference accept archives? If yes, add server-side extraction with bounded decompression |
+| OPEN-03 | Compressed uploads | n/a | `.dem.bz2` (Valve matchmaking), `.dem.gz`, `.zip` and `.rar` (tournaments/scrims) with exactly one `.dem` are extracted by the worker. Extraction is size-capped (`MAX_EXTRACTED_DEMO_BYTES`, 1.5 GiB) and never uses member paths. Multiple demos → `ARCHIVE_MULTIPLE_DEMOS`; damaged → `ARCHIVE_CORRUPT`. `.7z/.xz/.zst/.tar` are refused | real-world distribution formats | Matchframe product choice (owner's demos arrive in these formats) | done | `test_archive.py`, `test_jobs.py::test_compressed_upload_is_extracted_and_parsed`, real uploads: pass | pending | Which formats does the reference accept? Should a multi-demo archive create a series? |
 | OPEN-04 | CS:GO (Source 1) demo | Not observed | Rejected: "This is a CS:GO demo" (`LEGACY_DEMO`) | `HL2DEMO` header | Matchframe product choice | done | `test_header.py`, `test_jobs.py`: pass | pending | Does the reference support CS:GO? (Out of scope unless verified) |
 | OPEN-05 | Invalid or corrupt demo | Not observed | Finalise rejects files without the `PBDEMS2` header. Parser failures become `PARSE_ERROR` and are not retried | all | Matchframe product choice | done | `api.test.ts`, `test_jobs.py`: pass | pending | Reference error wording and recovery path |
 | OPEN-06 | POV demo | n/a | **Out of scope (owner decision, 2026-11-18).** Existing POV handling (partial-coverage badge, unknown players) is kept but not validated or required for release | POV recordings | Matchframe product choice | partial (not required) | `test_transform.py::test_pov_partial_coverage` (synthetic): pass | n/a | n/a |
@@ -160,10 +166,11 @@ The release map list depends on the reference audit. All values are in `web/src/
 
 | ID | Map | Calibration | Landmark check (3 per floor) | Radar asset | Status / gap |
 | --- | --- | --- | --- | --- | --- |
-| MAP-01 | Mirage | Overview origin (−3230, 1713), scale 5.0 | **not done** | none shipped (icon repo has no radars; see assets doc) | Fixture map. Gap: landmark verification and a cleared radar image |
+| MAP-01 | Mirage | Overview origin (−3230, 1713), scale 5.0 | **not done**; real-play bounds fall inside the image (px x 135–931, y 170–862) | none shipped (icon repo has no radars; see assets doc) | Fixture map. Gap: landmark verification and a cleared radar image |
 | MAP-02 | Dust II | (−2476, 3239), scale 4.4 | **not done** | none shipped | Fixture map. Same gaps |
 | MAP-03 | Nuke | (−3453, 2887), scale 7.0, lower floor z < −495 | **not done** (both floors) | none shipped | Fixture map. Gaps: landmarks, floor routes, radar images for both floors |
-| MAP-04 | Inferno, Ancient, Anubis, Overpass, Train, Vertigo | Values in the registry, status `unverified` | not done | none | Parses and renders on the grid. Not part of the verified release list |
+| MAP-04 | Inferno, Ancient, Anubis, Cache | Registry values; real-play bounds inside the image on owner demos → status `calibrated-unverified`. Cache added 2026-11-19 (CS:GO overview values, consistent with CS2 play bounds) | not done | none | Parse and render on the grid; landmark check and radar images pending |
+| MAP-06 | Overpass, Train, Vertigo | Registry values, status `unverified` | not done | none | No real demo yet |
 | MAP-05 | Reference map list | Not observed | n/a | n/a | needs reference access: which maps does EDGE support? |
 
 ## 12. Accessibility and states

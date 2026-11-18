@@ -17,6 +17,8 @@ const Req = z.object({
 
 const MAGIC_CS2 = Buffer.from("PBDEMS2\0", "latin1");
 const MAGIC_SYNTH = Buffer.from("MFSYNTH1", "latin1");
+/** Archives are extracted by the worker, which re-checks the demo inside. */
+const ARCHIVE_MAGICS = [Buffer.from("BZh", "latin1"), Buffer.from([0x1f, 0x8b]), Buffer.from("PK\x03\x04", "latin1"), Buffer.from("Rar!\x1a\x07", "latin1")];
 
 /** Finalise an upload exactly once: verify ownership and size, then create the replay and its parse job. */
 export const POST = route(async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
@@ -41,7 +43,8 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
       throw badRequest("The uploaded file size does not match the upload request.", "SIZE_MISMATCH");
     }
     const head = await storage.readHead(up.object_key, 8);
-    if (!head.equals(MAGIC_CS2) && !(process.env.MF_ALLOW_SYNTHETIC === "1" && head.equals(MAGIC_SYNTH))) {
+    const isArchive = ARCHIVE_MAGICS.some((m) => head.subarray(0, m.length).equals(m));
+    if (!head.equals(MAGIC_CS2) && !isArchive && !(process.env.MF_ALLOW_SYNTHETIC === "1" && head.equals(MAGIC_SYNTH))) {
       await storage.delete(up.object_key);
       await c.query("update uploads set status = 'rejected' where id = $1", [id]);
       const code = head.subarray(0, 7).toString("latin1") === "HL2DEMO" ? "LEGACY_DEMO" : "INVALID_DEMO";

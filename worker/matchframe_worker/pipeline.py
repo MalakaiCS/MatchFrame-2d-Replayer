@@ -13,6 +13,7 @@ from pathlib import Path
 
 from . import jobs
 from .config import Config
+from .archive import archive_kind, extract
 from .demo_header import classify_header
 from .errors import DemoTooLarge, JobError, LeaseLost, ParseResourceLimit, SourceMissing, TransientError
 from .storage import Storage
@@ -80,7 +81,8 @@ def process_parse(cfg: Config, conn, storage: Storage, job: dict) -> None:
     root = Path(cfg.work_dir)
     root.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(root).free
-    if size * 2 + (64 << 20) > min(free, cfg.max_tmp_bytes):
+    # Room for the upload, an extracted demo (when compressed) and parser scratch space.
+    if size + min(cfg.max_extracted_bytes, size * 4) + (64 << 20) > min(free, cfg.max_tmp_bytes):
         raise TransientError("Not enough temporary disk space for this demo; will retry.")
 
     conn.execute("update replays set status = 'processing', updated_at = now() where id = %s and revision = %s and status in ('queued','processing','failed')",
@@ -97,7 +99,17 @@ def process_parse(cfg: Config, conn, storage: Storage, job: dict) -> None:
             except ValueError as e:
                 raise DemoTooLarge(str(e)) from e
             with open(src, "rb") as fh:
-                classify_header(fh.read(16), allow_synthetic=cfg.allow_synthetic)
+                head = fh.read(16)
+            kind = archive_kind(head)
+            if kind:
+                extracted = workdir / "extracted.dem"
+                n = extract(kind, src, extracted, cfg.max_extracted_bytes)
+                log.info("extracted %s upload: %d -> %d bytes", kind, src.stat().st_size, n)
+                src.unlink()
+                src = extracted
+                with open(src, "rb") as fh:
+                    head = fh.read(16)
+            classify_header(head, allow_synthetic=cfg.allow_synthetic)
             if hb.lost.is_set():
                 raise LeaseLost("lease lost during download")
             series = {"id": rep["series_id"], "mapIndex": rep["series_map_index"]} if rep["series_id"] else None

@@ -8,6 +8,9 @@ import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
+/** Plain demos and the archive formats demos are distributed in (Valve: .dem.bz2; tournaments/scrims: .rar/.zip). */
+const ACCEPTED = /\.(dem|bz2|gz|zip|rar)$/;
+
 const Req = z.object({
   filename: z.string().min(1).max(255),
   size: z.number().int().positive(),
@@ -18,10 +21,12 @@ export const POST = route(async (req: Request) => {
   const user = await requireUser(req);
   const { filename, size } = await body(req, Req);
   const lower = filename.toLowerCase();
-  if (/\.(gz|bz2|zip|rar|7z|xz|zst)$/.test(lower)) {
-    throw badRequest("Compressed archives are not accepted. Extract the archive and upload the .dem file.", "COMPRESSED_ARCHIVE");
+  if (/\.(7z|xz|zst|tar)$/.test(lower)) {
+    throw badRequest("This archive type is not supported. Upload a .dem, .dem.bz2, .dem.gz, .zip or .rar file.", "UNSUPPORTED_ARCHIVE");
   }
-  if (!lower.endsWith(".dem")) throw badRequest("Only CS2 .dem files are accepted.", "UNSUPPORTED_FORMAT");
+  if (!ACCEPTED.test(lower)) {
+    throw badRequest("Upload a CS2 demo: .dem, or a .dem.bz2, .dem.gz, .zip or .rar containing one .dem.", "UNSUPPORTED_FORMAT");
+  }
   if (size > env.maxDemoBytes) {
     throw badRequest(`The demo is ${(size / 2 ** 20).toFixed(0)} MiB; the limit is ${(env.maxDemoBytes / 2 ** 20).toFixed(0)} MiB.`, "TOO_LARGE");
   }

@@ -60,6 +60,24 @@ def test_full_pipeline_publishes_and_removes_source(env):
     assert j["status"] == "succeeded" and j["result"]["rounds"] == 4 and "parseSeconds" in j["result"]
 
 
+@pytest.mark.parametrize("compress", ["bz2", "zip"])
+def test_compressed_upload_is_extracted_and_parsed(env, compress):
+    import bz2, io, zipfile
+    cfg, conn, storage, uid = env
+    demo = encode({"map": "de_dust2", "winners": "ABA"})
+    if compress == "bz2":
+        data = bz2.compress(demo)
+    else:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("match.dem", demo)
+        data = buf.getvalue()
+    rid, _ = make_replay(conn, storage, uid, data)
+    assert run_once(cfg, conn, storage)
+    r = replay(conn, rid)
+    assert r["status"] == "ready" and r["map_id"] == "de_dust2" and r["round_count"] == 3
+
+
 def test_duplicate_enqueue_is_idempotent(env):
     cfg, conn, storage, uid = env
     rid, _ = make_replay(conn, storage, uid, encode({"winners": "AB"}))
@@ -70,7 +88,7 @@ def test_duplicate_enqueue_is_idempotent(env):
 @pytest.mark.parametrize("data,code", [
     (b"definitely not a demo", "INVALID_DEMO"),
     (b"HL2DEMO\x00" + b"\x00" * 64, "LEGACY_DEMO"),
-    (b"\x1f\x8b\x08\x00" + b"\x00" * 64, "COMPRESSED_ARCHIVE"),
+    (b"\x1f\x8b\x08\x00" + b"\x00" * 64, "ARCHIVE_CORRUPT"),
     (encode({"winners": "AB", "header_map": "de_unknownmap"}), "UNSUPPORTED_MAP"),
 ])
 def test_permanent_failures_do_not_retry(env, data, code):

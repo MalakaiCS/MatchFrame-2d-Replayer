@@ -7,7 +7,7 @@ Date: 2026-11-18 · Branch: `claude/ecstatic-dijkstra-eem8d7`
 **Functional parity with the Skybox EDGE 2D Replayer: NOT PASSED (pending).** The claim cannot be made yet:
 
 1. **No reference access.** No authorised EDGE account, recordings or walkthroughs were available, and `skybox.gg` was unreachable from the build environment. Every reference-dependent row in [`replayer-parity.md`](replayer-parity.md) is still "publicly described" or "needs reference access", and none is "verified".
-2. **No real CS2 demo.** Public demo sources were blocked and none was supplied (GOTV demos only; POV is out of scope per owner decision). The Awpy adapter is written against the Awpy 3.3.0 dataset guide, but **it has not been run on a real `.dem`**. All end-to-end runs used the labelled SYNTHETIC fixture generator.
+2. ~~No real CS2 demo.~~ **Resolved 2026-11-19**: 11 owner-supplied real GOTV demos all parse (see "Real-demo validation"). Comparison of these demos against the reference viewer is still pending.
 3. **Not deployed.** There was no Railway or DNS access. [`railway.md`](railway.md) gives the exact steps, marked pending.
 
 The engineering vertical slice and the full workflow surface are implemented and pass their own tests on synthetic data. The parity audit, real-demo validation and deployment remain open.
@@ -64,6 +64,37 @@ Not covered:
 - The "slow previous-round response" case. Stale fetches are aborted in code (`RoundCache.cancelExcept`), but no test throttles a single round.
 - Audio drift against a real recording (not required, per owner).
 
+## Real-demo validation (2026-11-19)
+
+Owner-supplied demos via Google Drive: 7 tournament (`.rar`), 1 scrim (`.zip`) and 3 matchmaking (`.dem.bz2`), all GOTV. They are not committed. Regression tests are in `worker/tests/test_real_demos.py`.
+
+| Demo | Map | Teams (clan tags) | Final | Halves | Rounds | Parse (load + transform) | Peak RSS | Round payload gz (min/med/max KB) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Digital Crusade | Dust2 | BC.GAME vs WBT | 13–10 | 8:4; 5:6 | 23 | 13.9 + 8.0 s | 1000 MiB | 107 / 197 / 237 |
+| Digital Crusade | Mirage | HYPERSPIRIT vs Iberian Soul | 5–13 | 4:8; 1:5 | 18 | 8.5 + 5.1 s | 718 MiB | 92 / 175 / 219 |
+| Digital Crusade | Inferno | Iberian Soul vs Sashi Esport | 13–8 | 8:4; 5:4 | 21 | 12.2 + 6.7 s | 839 MiB | 59 / 180 / 263 |
+| Digital Crusade | Ancient | INFINITE vs Basement Boys | 13–5 | 12:0; 1:5 | 18 | 8.9 + 5.0 s | 661 MiB | 86 / 150 / 216 |
+| Digital Crusade | Nuke | Sashi Esport vs MOUZ NXT | 13–9 | 6:6; 7:3 | 22 | 10.6 + 6.5 s | 912 MiB | 80 / 175 / 234 |
+| Digital Crusade | Cache | SAW vs ASTRAL | 13–7 | 10:2; 3:5 | 20 | 8.1 + 4.8 s | n/a | n/a |
+| Digital Crusade | Anubis | SAW vs Bayankhongor | 13–1 | 11:1; 2:0 | 14 | 5.9 + 3.1 s | 522 MiB | 73 / 130 / 178 |
+| Scrim (8PM) | Inferno | TEAM1 vs TEAM2 | 18–6 | 11:1; 7:5 | 24 | 10.9 + 6.2 s | 913 MiB | 77 / 173 / 231 |
+| Matchmaking ×3 | Mirage | Team A vs Team B (no clan tags) | 18–6 · 15–9 · 7–17 | n/a | 24 each | ~10 + 7 s | 776–899 MiB | 63–91 / 133–163 / 208–247 |
+
+Findings:
+
+- **Every demo parsed.** Cache initially failed as `UNSUPPORTED_MAP`; it is now added to the registry.
+- **Round reconstruction**:
+  - No rounds were excluded.
+  - Half scores and side swaps are consistent: team identity is stable across the halftime swap in all demos.
+  - The clock is a countdown from the demo's convars (MM: 20 s freeze, 115.2 s round, 40 s bomb).
+- **Buy classification** agrees with Awpy's own `round_economy` in 100% of 452 team-rounds (pistol = pistol, eco = eco, half buy = force, full buy = full).
+- **Nuke floors**: about 12% of samples are assigned to the lower floor. The viewer's "Lower floor" mode marks upper-floor players as off-floor with ↑.
+- **Calibration sanity check**: real-play position bounds fall inside the 1024 px image for every map. This is **not** the three-landmark verification, which still needs radar images.
+- **Through the real app**: `.rar` Nuke (234 MB, 363 MB extracted) went from upload to ready in 23.7 s. `.dem.bz2` Mirage (259 MB, 361 MB extracted) took 43.3 s. Worker parse took about 15 s with a peak child RSS of about 911 MiB.
+- **Payload size** on real demos: median 130–197 KB per round (gzip). Time to interactive at 25 Mbps is estimated at under 0.5 s plus RTT, and still needs measuring on the deployed origin.
+
+The two `.mp4` files in the folder are broadcast footage, not EDGE recordings. They were not used.
+
 ## Benchmark (synthetic, not representative of real-demo parsing)
 
 | Item | Value |
@@ -94,7 +125,7 @@ Payload size is about 4× above an ideal compact encoding: JSON with 0.1-unit qu
 | # | Item | Blocker / next step |
 | --- | --- | --- |
 | 1 | Reference audit (all "needs reference access" rows) | Full-access EDGE account or owner recordings. Fill observation date, tier and steps per row |
-| 2 | Real-demo validation | Permitted GOTV demos (Mirage, Dust II, Nuke, one OT, one scrim). Run `awpy_source.load` and compare rounds, scores, sides, event ticks and positions with the reference |
+| 2 | Real-demo comparison with the reference | **Real demos now parse** (11/11). Still needed: an overtime demo (none of the 11 went to OT), and the same demos opened in EDGE to compare. Run `awpy_source.load` and compare rounds, scores, sides, event ticks and positions with the reference |
 | 3 | Awpy adapter on real files | Column mapping follows the 3.3.0 guide. Check `bombsite`, grenade `type` values, raw `*_detonate` fields and `player_disconnect.xuid` |
 | 4 | Parser memory cap | `WORKER_PARSE_MEMORY_BYTES` uses `RLIMIT_AS` (virtual memory). Confirm it does not kill a healthy Awpy parse, or set it to `0` and rely on the container limit |
 | 5 | Map calibration and radar assets | Three landmarks per floor for each release map. Cleared radar images or Matchframe-original radars. Nuke floor routes |

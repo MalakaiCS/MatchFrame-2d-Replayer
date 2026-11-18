@@ -32,7 +32,9 @@ class Config:
     map_registry_path: str = field(default_factory=lambda: os.environ.get("MAP_REGISTRY_PATH", _default_registry()))
     work_dir: str = field(default_factory=lambda: os.environ.get("WORKER_TMP_DIR", "/tmp/matchframe-worker"))
     max_demo_bytes: int = field(default_factory=lambda: _int("MAX_DEMO_BYTES", 512 * 1024 * 1024))
-    max_tmp_bytes: int = field(default_factory=lambda: _int("WORKER_MAX_TMP_BYTES", 2 * 1024 * 1024 * 1024))
+    # Cap on the demo extracted from a .bz2/.gz/.zip/.rar upload (tournament demos are often 300-500 MiB).
+    max_extracted_bytes: int = field(default_factory=lambda: _int("MAX_EXTRACTED_DEMO_BYTES", 1536 * 1024 * 1024))
+    max_tmp_bytes: int = field(default_factory=lambda: _int("WORKER_MAX_TMP_BYTES", 4 * 1024 * 1024 * 1024))
     parse_memory_bytes: int = field(default_factory=lambda: _int("WORKER_PARSE_MEMORY_BYTES", 6 * 1024 * 1024 * 1024))
     parse_timeout_s: int = field(default_factory=lambda: _int("WORKER_PARSE_TIMEOUT_S", 900))
     lease_seconds: int = field(default_factory=lambda: _int("WORKER_LEASE_SECONDS", 60))

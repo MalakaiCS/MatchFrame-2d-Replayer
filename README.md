@@ -55,7 +55,7 @@ cd worker && uv venv .venv && uv pip install --python .venv/bin/python -e '.[tes
 cd worker && DATABASE_URL=postgres://mf:mf@localhost/matchframe STORAGE_DRIVER=fs STORAGE_FS_ROOT=/abs/path/.data/objects MF_ALLOW_SYNTHETIC=1 .venv/bin/python -m matchframe_worker.main
 ```
 
-7. Open http://localhost:3000, create an account and upload a `.dem` file.
+7. Open http://localhost:3000, create an account and upload a demo: `.dem`, `.dem.bz2`, `.dem.gz`, `.zip` or `.rar` with one demo inside. RAR needs `bsdtar` (`apt-get install libarchive-tools`); the worker image includes it.
 
 Without a real demo, generate a **synthetic** fixture. The worker accepts it only when `MF_ALLOW_SYNTHETIC=1`:
 
@@ -77,6 +77,12 @@ cd worker && .venv/bin/python -c "from matchframe_worker.awpy_source import load
 
 ```bash
 cd worker && .venv/bin/python -m pytest -q
+```
+
+Real-demo regression tests (owner-supplied demos, not in git) run when `MF_REAL_DEMOS_DIR` points at the extracted `.dem` files:
+
+```bash
+cd worker && MF_REAL_DEMOS_DIR=/path/to/demos .venv/bin/python -m pytest -q tests/test_real_demos.py
 ```
 
 Unit tests (transform rules, filters, playback, clock, maps, share links, audio sync):
