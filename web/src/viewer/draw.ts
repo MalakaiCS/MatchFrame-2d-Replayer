@@ -11,6 +11,13 @@ import type { PlayerInfo, Side } from "@/shared/contract";
 import { imageToScreen, type MapDef, type Viewport, worldToImage, yawToCanvas, fitScale } from "./maps";
 import type { Frame } from "./playback";
 
+/** Freehand annotation in original radar-image pixels, so it stays attached to the map when panning/zooming. */
+export interface Stroke {
+  color: string;
+  width: number;
+  points: [number, number][];
+}
+
 export interface DrawOptions {
   map: MapDef;
   viewport: Viewport;
@@ -27,6 +34,7 @@ export interface DrawOptions {
   showTrails: boolean;
   showUtility: boolean;
   showDeaths: boolean;
+  strokes?: Stroke[];
 }
 
 export const COLORS = {
@@ -273,8 +281,24 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
     if (o.showNames) label(ctx, px, py + r + 11, info.name, 11);
     ctx.globalAlpha = 1;
   }
-}
 
+  // --- annotations (drawn last, on top)
+  for (const st of o.strokes ?? []) {
+    if (st.points.length < 2) continue;
+    ctx.beginPath();
+    st.points.forEach(([px, py], i) => {
+      const [sx, sy] = imageToScreen(v, map.imageSize, w, h, px, py);
+      if (i === 0) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
+    });
+    ctx.strokeStyle = st.color;
+    ctx.lineWidth = st.width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+}
 function label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, size: number) {
   ctx.font = `600 ${size}px ui-sans-serif, system-ui, sans-serif`;
   ctx.textAlign = "center";

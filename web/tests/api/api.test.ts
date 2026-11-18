@@ -357,3 +357,20 @@ describe("payload compression", () => {
     expect(JSON.parse(gunzipSync(raw).toString()).roundId).toBe("r01");
   });
 });
+
+describe("team names", () => {
+  it("owner can rename teams; the edit reaches the manifest and can be restored", async () => {
+    const original = manifest.teams.A.name;
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: "Alpha Edited" } }, 200);
+    const r = await owner.json(`/api/replays/${replayId}`);
+    expect(r.manifest.teams.A.name).toBe("Alpha Edited");
+    expect(r.manifest.teams.A.nameSource).toBe("edited");
+    expect(r.replay.teamA).toBe("Alpha Edited");
+    const lib = await owner.json(`/api/replays?q=Alpha%20Edited`);
+    expect(lib.replays.map((x: any) => x.id)).toContain(replayId);
+    expect((await outsider.req(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: "x" } })).status).toBe(404);
+    expect((await mate.req(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: "x" } })).status).toBe(403);
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: null } }, 200);
+    expect((await owner.json(`/api/replays/${replayId}`)).manifest.teams.A.name).toBe(original);
+  });
+});

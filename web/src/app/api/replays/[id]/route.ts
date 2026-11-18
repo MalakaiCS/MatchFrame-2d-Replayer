@@ -12,7 +12,17 @@ export const GET = route(async (req: Request, ctx: Ctx) => {
   const { id } = await ctx.params;
   const a = await replayAccess(req, id);
   const r = a.replay;
-  const manifest = r.status === "ready" && r.published_prefix ? await loadManifest(r.published_prefix) : null;
+  const base = r.status === "ready" && r.published_prefix ? await loadManifest(r.published_prefix) : null;
+  // Apply edited team names to a copy; the cached manifest is shared and immutable.
+  const manifest = base && (r.team_a_override || r.team_b_override)
+    ? {
+        ...base,
+        teams: {
+          A: { ...base.teams.A, name: r.team_a_override ?? base.teams.A.name, nameSource: r.team_a_override ? ("edited" as const) : base.teams.A.nameSource },
+          B: { ...base.teams.B, name: r.team_b_override ?? base.teams.B.name, nameSource: r.team_b_override ? ("edited" as const) : base.teams.B.nameSource },
+        },
+      }
+    : base;
   let series: unknown[] = [];
   if (r.series_id && a.user) {
     series = await q(
@@ -30,13 +40,18 @@ const Patch = z.object({
   visibility: z.enum(["private", "team"]).optional(),
   seriesId: z.string().max(64).regex(/^[A-Za-z0-9_-]+$/).nullable().optional(),
   seriesMapIndex: z.number().int().min(1).max(7).nullable().optional(),
+  /** Team name edits; null restores the parsed name. */
+  teamAName: z.string().trim().min(1).max(60).nullable().optional(),
+  teamBName: z.string().trim().min(1).max(60).nullable().optional(),
 });
 
 export const PATCH = route(async (req: Request, ctx: Ctx) => {
   const { id } = await ctx.params;
   const a = await replayAccess(req, id);
-  if (a.via !== "owner") throw forbidden("Only the owner can change this replay.");
   const p = await body(req, Patch);
+  const namesOnly = Object.keys(p).every((k) => k === "teamAName" || k === "teamBName");
+  // Team owners/coaches may correct team names on a team replay; everything else is owner-only.
+  if (a.via !== "owner" && !(namesOnly && a.canManage)) throw forbidden("Only the owner can change this replay.");
   if (p.teamId) {
     const m = a.teams.find((t) => t.team_id === p.teamId);
     if (!m || m.role === "viewer") throw badRequest("You cannot assign replays to that team.");
@@ -52,6 +67,8 @@ export const PATCH = route(async (req: Request, ctx: Ctx) => {
   if (p.visibility !== undefined) add("visibility", p.visibility);
   if (p.seriesId !== undefined) add("series_id", p.seriesId);
   if (p.seriesMapIndex !== undefined) add("series_map_index", p.seriesMapIndex);
+  if (p.teamAName !== undefined) add("team_a_override", p.teamAName);
+  if (p.teamBName !== undefined) add("team_b_override", p.teamBName);
   if (sets.length) await q(`update replays set ${sets.join(", ")}, updated_at = now() where id = $1`, vals);
   return json({ ok: true });
 });

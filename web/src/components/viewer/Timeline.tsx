@@ -2,6 +2,14 @@
 import type { GameEvent, Manifest, PlayerInfo, RoundSummary } from "@/shared/contract";
 import { formatMs } from "@/viewer/clock";
 
+/** Planted-bomb window: plant tick to defuse/explosion (or round end when neither was recorded). */
+export function bombWindow(events: GameEvent[], round: RoundSummary): [number, number] | null {
+  const plant = events.find((e) => e.type === "bomb_plant");
+  if (!plant) return null;
+  const end = events.find((e) => e.tick >= plant.tick && (e.type === "bomb_defuse" || e.type === "bomb_explode"));
+  return [plant.tick, end?.tick ?? round.endTick - 1];
+}
+
 export interface TimelineBookmark { id: string; tick: number; title: string }
 
 export function Timeline({
@@ -23,6 +31,14 @@ export function Timeline({
 
   return (
     <div className="timeline">
+      {bombWindow(events, round) ? (() => {
+        const [a, b] = bombWindow(events, round)!;
+        return (
+          <div className="timeline-bomb" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }} aria-hidden="true">
+            <span>Bomb</span>
+          </div>
+        );
+      })() : null}
       <div className="timeline-markers">
         {round.freezeEndTick !== null ? (
           <button type="button" className="tmark" data-kind="freeze" style={{ left: pct(round.freezeEndTick) }}

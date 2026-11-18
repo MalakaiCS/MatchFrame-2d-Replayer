@@ -44,6 +44,7 @@ export function PlayersPanel({
             <div className="dock-section-title">
               <span className={`side side-${side}`}>{side}</span>
               <span>{manifest.teams[k].name}</span>
+              <span className="mono" aria-label={`${manifest.teams[k].name} score`}>{round.scoreBefore[k]}</span>
               <span className="grow" />
               {round.economy[k].equipmentValue !== null ? <span className="mono">${round.economy[k].equipmentValue?.toLocaleString()}</span> : null}
             </div>
@@ -65,6 +66,7 @@ export function PlayersPanel({
                     {!known ? "unknown" : dead ? "dead" : caps.health && f?.hp != null ? `${f.hp} HP` : ""}
                   </span>
                   {known && caps.health && f?.hp != null ? <span className="hp"><div style={{ width: `${f.hp}%` }} /></span> : null}
+                  {known && f && selected === pl.id ? <SetposCopy x={f.x} y={f.y} z={f.z} /> : null}
                   {known ? (
                     <span className="player-sub">
                       <span className="inv-icons"><WeaponIcon name={f?.weapon} height={16} label={`holding ${short(f?.weapon)}`} /></span>
@@ -95,6 +97,26 @@ export function PlayersPanel({
         </button>
       </div>
     </div>
+  );
+}
+
+/** In-game console command that puts the local player at this position (view angles are not included). */
+export function setposCommand(x: number, y: number, z: number) {
+  return `setpos ${x.toFixed(3)} ${y.toFixed(3)} ${z.toFixed(3)}`;
+}
+
+function SetposCopy({ x, y, z }: { x: number; y: number; z: number }) {
+  const [done, setDone] = useState(false);
+  const cmd = setposCommand(x, y, z);
+  return (
+    <span className="setpos" onClick={(e) => e.stopPropagation()}>
+      <input className="input mono" readOnly value={cmd} aria-label="setpos console command" onFocus={(e) => e.target.select()} />
+      <span role="button" tabIndex={0} className="btn btn-sm" aria-label="Copy setpos command"
+        onClick={async () => { try { await navigator.clipboard.writeText(cmd); } catch { /* fall back to the selectable field */ } setDone(true); }}
+        onKeyDown={async (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); try { await navigator.clipboard.writeText(cmd); } catch { /* noop */ } setDone(true); } }}>
+        {done ? "Copied" : "Copy"}
+      </span>
+    </span>
   );
 }
 

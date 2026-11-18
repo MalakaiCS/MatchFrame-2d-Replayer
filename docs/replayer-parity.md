@@ -8,8 +8,8 @@ No row is "verified". No material workflow has been compared against the referen
 | Item | Value |
 | --- | --- |
 | Reference product | Skybox EDGE 2D Replayer, full-access tier |
-| Reference observation date | 2026-11-18: one owner-provided screenshot of the EDGE team overview page (see "Reference observations"). **The 2D Replayer itself has not been observed** |
-| Reference tier observed | Screenshot shows a "Get Free Trial / Enjoy the Pro membership" prompt, so it is **probably not the full-access tier**. Unconfirmed |
+| Reference observation date | 2026-11-18/19: owner-provided screenshots (OBS-SHOT-01 to 06): team overview, match page, **one 2D Replayer view**, the replayer scoreboard with the setpos popover, player stats, and the tier table |
+| Reference tier observed | Every screenshot shows a "Get Free Trial / Enjoy the Pro membership" prompt, so this is **probably the Core 2D Replayer tier**, not Full access (tier table: Tier 3 = Core, Tier 2 = Advanced, Tier 1 = Full access). Advanced and Full-access replayer features remain unobserved |
 | Public sources consulted | The brief's summary of the official EDGE page and Skybox pricing. `skybox.gg` was **unreachable** from the build sandbox on 2026-11-18 (HTTP connect failed), so the public pages have not been re-read first-hand |
 | Fixtures used | Deterministic **SYNTHETIC** match generator (`worker/matchframe_worker/synthetic.py`) on Mirage, Dust II and Nuke. **No real CS2 demo was available**: public demo hosts were blocked from the sandbox, and none was supplied |
 | Parser | Awpy 3.3.0 (pinned). Column mapping is taken from the Awpy 3.3.0 dataset guide in its source distribution, not from a real demo run |
@@ -73,6 +73,9 @@ No row is "verified". No material workflow has been compared against the referen
 | NAV-06 | Autoplay into next round | Not observed | On by default. At round end, continues into the next (filtered) round | all | needs reference access | done | Manual | pending | Reference default (on/off)? Does it skip post-round time? |
 | NAV-07 | Freeze-time skip | Not observed | "Skip freeze time" toggle (off by default). `F` jumps to the freeze end | rounds with `freeze_end` | needs reference access | done | Manual | pending | Reference default |
 | NAV-08 | Round boundaries | n/a | `[startTick, endTick)`, where `endTick` = next round's start (or official end + 1 for the last round). Warmup, pre-restart, incomplete and knife rounds are excluded | all | Matchframe product choice | done | `test_transform.py` boundary/restart/knife tests: pass (synthetic) | pending | Compare round count and boundaries with the reference on 3 real demos |
+| NAV-10 | Rename teams on a match | OBS-SHOT-02 pencil icons | Pencil next to each team name. Edits are stored as overrides (`team_a_override`/`team_b_override`), survive reprocessing, and empty input restores the demo's name. Owner, or team owner/coach | all | verified (visible; behaviour not observed) | done | `api.test.ts` "team names": pass | pending | Who may rename in the reference? Is the rename per user or global? |
+| NAV-11 | Per-half score breakdown | OBS-SHOT-02 "(12:0; 1:0)" | Header shows "(1st half; 2nd half; OT total)", each number coloured by that team's side | all | verified (visible) | done | visual (screenshot) | pending | How does the reference break down overtime? |
+| NAV-12 | Back button and match-page entry | OBS-SHOT-02/03 | "‹ Back" to the library. The replayer opens from library rows (the reference opens from a match page) | all | verified (visible) | done | E2E | pending | n/a |
 | NAV-09 | Event jumps | Not observed | `J`/`L` and buttons jump to the previous/next kill or bomb event at its exact tick | all | needs reference access | done | `viewer.test.ts` "event jumps land on recorded ticks": pass | pending | Which event types does the reference jump between? |
 
 ## 4. Play and seek
@@ -83,6 +86,7 @@ No row is "verified". No material workflow has been compared against the referen
 | PLAY-02 | Scrubbing | Not observed | Range input over the round's ticks, with kill/bomb/freeze/bookmark markers | all | needs reference access | done | `viewer.spec.ts`: pass | pending | Does the reference scrub per round or per match? |
 | PLAY-03 | Seek shortcuts | Not observed | ←/→ ±5 s. Shift+←/→ ± one sample (4 ticks). Home/End | all | needs reference access | done | `viewer.spec.ts`: pass | pending | **Reference step sizes** |
 | PLAY-04 | Speeds | Not observed | 0.25×, 0.5×, 1×, 2×, 4×, 8×. `,`/`.` step through them | all | needs reference access | done | `viewer.spec.ts`: pass | pending | **Reference speed list** |
+| PLAY-08 | Bomb segment on timeline | OBS-SHOT-03 | Shaded red "Bomb" region from the plant to the defuse/explosion (or round end) | rounds with a plant | verified (visible) | done | visual | pending | n/a |
 | PLAY-05 | Phase clock | n/a | Freeze / round / post-plant countdown from convars and recorded ticks. Falls back to labelled elapsed time | all | Matchframe product choice | done | `viewer.test.ts` "clock": pass | pending | Compare clock readings at three ticks per phase against the reference |
 | PLAY-06 | Deterministic seek | n/a | `frameAt(payload, tick)` is pure. Forward, backward and random seek orders give identical frames | all | Matchframe product choice (brief) | done | `viewer.test.ts` "deterministic seeking": pass | n/a | n/a |
 | PLAY-07 | Interpolation | n/a | Positions are linearly interpolated, and yaw takes the shortest arc, only between compatible samples. Deaths, teleports, gaps over 2 samples and floor changes snap or hide | all | Matchframe product choice (brief) | done | `viewer.test.ts` "players": pass | pending | Visual smoothness vs reference |
@@ -95,7 +99,7 @@ No row is "verified". No material workflow has been compared against the referen
 | OBS-02 | Alive/dead | n/a | Dead from the recorded kill tick. The death marker (×) persists for the round | all | Matchframe product choice (brief) | done | `viewer.test.ts`: pass | pending | n/a |
 | OBS-03 | Selection and follow | Not observed | Click a marker or player row to select. "Follow selected player" centres the view | all | needs reference access | done | Manual | pending | Reference follow behaviour |
 | OBS-04 | Pan and zoom | Not observed | Drag, wheel zoom about the cursor, ± buttons, `0` / double-click reset | all | needs reference access | done | `viewer.test.ts` "zooming keeps the cursor point fixed": pass | pending | n/a |
-| OBS-05 | Player state fields | Not observed | HP, armour/helmet, kit, bomb, active weapon, money, inventory (when the demo provides them), shown with CS2 equipment icons | GOTV | needs reference access | done | Manual | pending | **Which fields does the reference display?** |
+| OBS-05 | Player state fields | OBS-SHOT-03 (per-team scoreboards) | HP, armour/helmet, kit, bomb, active weapon, money, inventory (when the demo provides them), shown with CS2 equipment icons | GOTV | needs reference access | done | Manual | pending | **Which fields does the reference display?** |
 | OBS-06 | Bomb state | n/a | carried / dropped (with position) / planting / planted (site, position) / defusing / defused / exploded. Exact location is omitted when unrecorded | all | Matchframe product choice (brief) | done | `test_transform.py::test_bomb_lifecycle`, `viewer.test.ts`: pass (synthetic) | pending | Verify against a real demo; Awpy has no defuse-begin position |
 | OBS-07 | Multi-floor (Nuke) | n/a | Floor from the z threshold (`zMax −495` on Nuke) with a ±40-unit uncertainty band. Floor selector: other-floor players drawn hollow with ↑/↓ | Nuke, Vertigo | Matchframe product choice | partial | `test_transform.py::test_nuke_floors`, `viewer.test.ts`: pass | pending | **Thresholds unverified.** Validate routes between floors with real footage |
 
@@ -130,7 +134,7 @@ No row is "verified". No material workflow has been compared against the referen
 | REV-03 | Playlists | Not observed | Create, rename, delete. Add the current moment with a label. Reorder (optimistic version, transactional). Play entry-to-entry across replays | all | publicly described | done | `api.test.ts` "playlists" including the concurrency test: pass | pending | Reference playlist item kinds (moment / round / range) and playback behaviour |
 | REV-04 | Team access to review items | Not observed | Roles owner/coach/analyst/player/viewer. Team items require the team to have replay access. Unavailable entries never leak replay metadata | all | needs reference access | done | `api.test.ts`: pass | pending | Reference role model |
 | REV-05 | Revision anchors | n/a | Anchors store replay, revision, round and tick. They migrate only when the round still contains the tick, otherwise they show as unavailable | reprocessed replays | Matchframe product choice (brief) | done | Code path covered by `anchorStatus`; no dedicated test yet | n/a | n/a |
-| REV-06 | Map drawing / annotation | Not observed | **Not implemented** | n/a | needs reference access | not started | n/a | pending | Does the reference have drawing tools? Which operations? |
+| REV-06 | Map drawing / annotation | OBS-SHOT-03: hand (pan), pencil (draw), X (clear) | Pan/draw toggle (`D`), four pen colours, freehand strokes stored in radar-image coordinates (they follow pan and zoom), kept per round for the session, X clears the current round | all | verified (tools visible; behaviour not observed) | done | manual (screenshot) | pending | Are drawings saved or shared? Per round or per moment? Colours, shapes, eraser? |
 
 ## 9. Voice comms
 
@@ -197,10 +201,59 @@ Scope assessment:
 - The overview, statistics and leaderboard pages are **outside the 2D Replayer boundary** (team scouting and statistics) and are not planned.
 - Two leads are relevant to the replayer and are added below as rows needing reference access: the Steam auto-import, and the own/opponent buy-type split for round filters.
 
+### OBS-SHOT-02: EDGE match page (owner screenshot, 2026-11-18)
+
+- **Header**:
+  - Map name and both team names, each with a **pencil (rename) icon**.
+  - Final score coloured per team, with a **per-half breakdown "(12:0; 1:0)"** coloured by side.
+  - "Played on <date>".
+- **"OPEN IN 2D REPLAYER" button**: the match page is the replayer's entry point.
+- **Scoreboard per team**: role, HLTV rating, K/A/D, KD diff, K/D, ADR, KAST, UDR, opening duels and rounds played. Both sides / CT / T toggle. One player is marked with an "E" badge (meaning unknown).
+- **Scope**: the scoreboard statistics are match analytics, outside the replayer boundary. The rename and half-score behaviour are implemented (NAV-10, NAV-11).
+
+### OBS-SHOT-03: EDGE 2D Replayer, Train, round 1 (owner screenshot, 2026-11-19, probably Core tier)
+
+- **Layout**: "Back" button at the top left. Radar centred. Two team scoreboard panels on the right, one per team, framed in that team's side colour. A tool row at the bottom left, a round selector, then the transport bar.
+- **Radar**: player dots with **name labels in boxes**, and a bomb marker.
+- **Scoreboard per player**:
+  - Name in capitals.
+  - **Ammo "clip/reserve"** (e.g. 30/120, 12/24, 20/120) next to primary and secondary weapon icons.
+  - Health bar with the number in the side colour.
+  - Armour icon and money.
+  - Defuse-kit and bomb icons.
+  - The team header shows the score.
+- **Tool row**: settings (gear), keyboard (shortcuts), **hand (pan, selected)**, **pencil (draw)**, **X (clear drawings)**. A **"MULTI ROUND"** toggle is visible but greyed out (likely a higher-tier feature).
+- **Round selector**: numbered rounds 1–13 with an underline coloured by the winning side. The current round is highlighted. A **dashed divider marks halftime** (between 12 and 13). Prev/next arrows.
+- **Transport**: play button with a speed badge ("1x"), a stopwatch with the round clock "1:55" (countdown), and a timeline:
+  - vertical event ticks coloured by side;
+  - a **shaded red "Bomb" segment** from plant to round end, with a bomb icon at the plant and a defuse icon at the end.
+
+### OBS-SHOT-04: replayer scoreboard, setpos popover (owner screenshot, 2026-11-19)
+
+Next to a player row, a popover shows the in-game console command **"setpos 1594.838 -1434.9…"** (three decimals) with a copy button.
+
+### OBS-SHOT-05: player stats page (owner screenshot, 2026-11-19)
+
+- Statistics, out of scope.
+- Relevant lead for FILT-03: EDGE's buy-type vocabulary includes **"Full Buy"**, **"Half Buy + Eco"** and **"Pistol Rounds"**. This suggests reference categories of Pistol / Eco / Half buy / Full buy, against Matchframe's Eco / Semi-eco / Semi-buy / Full.
+
+### OBS-SHOT-06: EDGE tier table (owner screenshot, 2026-11-19)
+
+| Feature | Tier 3 | Tier 2 | Tier 1 |
+| --- | --- | --- | --- |
+| 2D Replayer | Core | Advanced | Full access |
+| Public demos & POV demos | Unlimited | Unlimited | Unlimited + full support |
+| Filters across platform | Very limited | Limited | Full access |
+
+Pattern Finder, Playbook & Match Prep and Veto simulation are separate products, out of scope. The brief targets **Tier 1 (Full access)**; the differences between the tiers are unknown.
+
 ## Features found in the reference but missing from the brief
 
 | ID | Feature | Source | Evidence | Impl. | Open question |
 | --- | --- | --- | --- | --- | --- |
 | NEW-01 | Automatic match import via Steam (sharecode + game authentication code) | OBS-SHOT-01 banner | needs reference access | not started | Is this part of the 2D Replayer workflow or a platform feature? It needs Valve match-history API access and demo download from Valve replay servers |
 | NEW-02 | Separate own vs opponent buy-type filters | OBS-SHOT-01 filter bar ("All buys", "OPP All buys") | needs reference access | partial: the round filters already pick the team for the buy filter (`buyTeam`) but cannot set both teams independently | Does the 2D Replayer's round list expose own and opponent buy filters? What buy categories does it list? |
+| NEW-04 | Ammo (clip / reserve) per player | OBS-SHOT-03 | verified (visible) | **not started**: Awpy 3.3.0 snapshots have no clip/reserve fields | Read the active weapon's `m_iClip1` and reserve through `demo.ticks(players_only=False)` on weapon entities, joined to the active-weapon handle. Needs a real demo to build and verify |
+| NEW-05 | Multi-round mode | OBS-SHOT-03 (greyed toggle) | needs reference access (higher tier) | not started | What does it do: overlay several rounds, or play rounds back to back? Which tier? |
+| NEW-06 | setpos copy | OBS-SHOT-04 | verified (visible) | done: selecting a player shows `setpos x y z` (3 decimals) with Copy | Does the reference also offer `setang`? Where exactly is it triggered (hover or click)? |
 | NEW-03 | Copy-link button on filtered views | OBS-SHOT-01 link icon | needs reference access | done for the replayer (filters are kept in `?f=` and the moment in `?r=&t=`) | Does the replayer's link carry filters? |

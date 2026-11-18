@@ -58,7 +58,7 @@ export async function playlistEntries(user: SessionUser, playlistId: string) {
   const ids = [...new Set(entries.map((e) => e.replay_id).filter(Boolean))] as string[];
   const visible = ids.length
     ? await q<{ id: string; map_id: string; team_a_name: string; team_b_name: string; title: string | null; published_prefix: string | null; status: string }>(
-        `select r.id, r.map_id, r.team_a_name, r.team_b_name, r.title, r.published_prefix, r.status
+        `select r.id, r.map_id, coalesce(r.team_a_override, r.team_a_name) as team_a_name, coalesce(r.team_b_override, r.team_b_name) as team_b_name, r.title, r.published_prefix, r.status
            from replays r where r.id = any($2::text[]) and ${VISIBLE_REPLAYS_SQL}`,
         [user.id, ids],
       )

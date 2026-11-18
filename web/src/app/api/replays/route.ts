@@ -17,7 +17,7 @@ export const GET = route(async (req: Request) => {
   if (search) {
     params.push(`%${search.replace(/[%_\\]/g, (m) => "\\" + m)}%`);
     const i = params.length;
-    where.push(`(r.title ilike $${i} or r.team_a_name ilike $${i} or r.team_b_name ilike $${i} or r.source_filename ilike $${i} or r.map_id ilike $${i})`);
+    where.push(`(r.title ilike $${i} or r.team_a_name ilike $${i} or r.team_b_name ilike $${i} or r.team_a_override ilike $${i} or r.team_b_override ilike $${i} or r.source_filename ilike $${i} or r.map_id ilike $${i})`);
   }
   if (map) {
     params.push(map);

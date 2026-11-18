@@ -201,6 +201,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
     ["V", "Cycle floor (multi-floor maps)"],
     ["+ / − / 0", "Zoom in / out / reset view"],
     ["B / N", "Bookmark / note at this moment"],
+    ["D", "Toggle the draw tool"],
     ["?", "Show this list"],
   ];
   return (

@@ -30,7 +30,7 @@ export interface TeamIdentity {
   key: TeamKey;
   name: string;
   /** Where the name came from: the in-game clan tag, or a generated fallback label. */
-  nameSource: "clan" | "fallback";
+  nameSource: "clan" | "fallback" | "edited";
   startSide: Side;
 }
 

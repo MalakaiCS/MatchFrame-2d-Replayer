@@ -6,16 +6,16 @@ import type { Manifest, PlayerInfo, RoundSummary, Side } from "@/shared/contract
 import { tickToRoundMs } from "@/shared/contract";
 import type { AudioSync } from "@/viewer/audioSync";
 import { clockAt } from "@/viewer/clock";
-import { drawFrame, playerAtPoint } from "@/viewer/draw";
+import { drawFrame, playerAtPoint, type Stroke } from "@/viewer/draw";
 import { filterRounds, filtersFromParam, filtersToParam, type RoundFilters } from "@/viewer/filters";
-import { getMapDef, mapName, type Viewport, worldToImage, zoomAt } from "@/viewer/maps";
+import { getMapDef, mapName, screenToImage, type Viewport, worldToImage, zoomAt } from "@/viewer/maps";
 import { frameAt, inventoryAt, nextEvent, type Frame, type RoundIndex } from "@/viewer/playback";
 import { RoundCache } from "@/viewer/roundCache";
 import { buildReplayUrl, resolveMoment, shareTokenFromHash } from "@/viewer/shareUrl";
 import { api, ApiError, setShareToken } from "../api";
 import {
   IconBack, IconFit, IconForward, IconKeyboard, IconLayers, IconNextEvent, IconNextRound, IconPause, IconPlay,
-  IconPrevEvent, IconPrevRound, IconShare, IconZoomIn, IconZoomOut,
+  IconClose, IconEdit, IconPrevEvent, IconPrevRound, IconShare, IconZoomIn, IconZoomOut,
 } from "../icons";
 import { StatusBadge } from "../Library";
 import { CommsPanel } from "./CommsPanel";
@@ -140,6 +140,10 @@ function Workspace({
   const [shareOpen, setShareOpen] = useState(false);
   const [kbdOpen, setKbdOpen] = useState(false);
   const [composeSignal, setComposeSignal] = useState(0);
+  const [tool, setTool] = useState<"pan" | "draw">("pan");
+  const [penColor, setPenColor] = useState(PEN_COLORS[0].value);
+  const strokes = useRef<Map<string, Stroke[]>>(new Map());
+  const [strokeCount, setStrokeCount] = useState(0);
   const [notice, setNotice] = useState<string | null>(initial.clamped ? "The link pointed outside this replay; opened the nearest valid moment." : null);
 
   const round = manifest.rounds.find((r) => r.id === roundId)!;
@@ -316,6 +320,7 @@ function Workspace({
         case "0": resetView(); break;
         case "b": case "B": if (canReview) { setDockTab("bookmarks"); setComposeSignal((n) => n + 1); } break;
         case "n": case "N": if (canReview) { setDockTab("notes"); setComposeSignal((n) => n + 1); } break;
+        case "d": case "D": setTool((t) => (t === "draw" ? "pan" : "draw")); break;
         case "?": setKbdOpen(true); break;
         default: handled = false;
       }
@@ -378,6 +383,7 @@ function Workspace({
           map, viewport: viewport.current, width: w, height: h, dpr, frame, players: playersRef.current, selected: o.selected,
           floor: floorShown, radar: radarImgs.current.get(o.floor === "auto" ? 0 : o.floor) ?? null,
           showNames: o.toggles.names, showTrails: o.toggles.trails, showUtility: o.toggles.utility, showDeaths: o.toggles.deaths,
+          strokes: strokes.current.get(r.id),
         });
         lastFrame.current = frame;
         dirty.current = playingRef.current;
@@ -406,11 +412,31 @@ function Workspace({
 
   // ---- pointer: pan, wheel zoom, click to select
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const drawing = useRef<Stroke | null>(null);
+  const toImage = (e: React.PointerEvent): [number, number] => {
+    const el = wrapRef.current!;
+    const rect = el.getBoundingClientRect();
+    return screenToImage(viewport.current, map.imageSize, el.clientWidth, el.clientHeight, e.clientX - rect.left, e.clientY - rect.top);
+  };
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    if (tool === "draw") {
+      const st: Stroke = { color: penColor, width: 3, points: [toImage(e)] };
+      drawing.current = st;
+      const list = strokes.current.get(round.id) ?? [];
+      list.push(st);
+      strokes.current.set(round.id, list);
+      dirty.current = true;
+      return;
+    }
     drag.current = { x: e.clientX, y: e.clientY, moved: false };
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (drawing.current) {
+      drawing.current.points.push(toImage(e));
+      dirty.current = true;
+      return;
+    }
     const d = drag.current;
     const el = wrapRef.current;
     if (!d || !el) return;
@@ -426,6 +452,11 @@ function Workspace({
     dirty.current = true;
   };
   const onPointerUp = (e: React.PointerEvent) => {
+    if (drawing.current) {
+      drawing.current = null;
+      setStrokeCount((n) => n + 1);
+      return;
+    }
     const d = drag.current;
     drag.current = null;
     const el = wrapRef.current;
@@ -480,6 +511,7 @@ function Workspace({
   return (
     <div className="ws">
       <header className="ws-header">
+        <Link href="/replays" className="btn btn-ghost btn-sm" aria-label="Back to library">‹ Back</Link>
         <span className="ws-map">{mapName(manifest.map.id)}</span>
         {data.series.length > 1 ? (
           <select className="select btn-sm" style={{ height: 28 }} aria-label="Series map" value={id}
@@ -492,10 +524,11 @@ function Workspace({
           </select>
         ) : null}
         <div className="ws-teams" aria-label={`Score before round ${round.displayNumber}`}>
-          <span className="ws-team"><span className={`side side-${round.sides.A}`}>{T.A.name}</span></span>
+          <span className="ws-team"><span className={`side side-${round.sides.A}`}>{T.A.name}</span>{data.access.canManage ? <RenameTeam replayId={id} team="A" current={T.A.name} onDone={reload} /> : null}</span>
           <span className="ws-score" aria-live="off">{scoreBefore.A} : {scoreBefore.B}</span>
-          <span className="ws-team"><span className={`side side-${round.sides.B}`}>{T.B.name}</span></span>
+          <span className="ws-team"><span className={`side side-${round.sides.B}`}>{T.B.name}</span>{data.access.canManage ? <RenameTeam replayId={id} team="B" current={T.B.name} onDone={reload} /> : null}</span>
         </div>
+        <HalfScores manifest={manifest} />
         <span className="muted" style={{ fontSize: 13 }}>
           Round {round.displayNumber}{round.isOvertime ? " · OT" : ""}{round.winner && uiTick >= (round.decidedTick ?? Infinity) ? ` · ${T[round.winner].name} won (${reasonText(round.endReason)})` : ""}
         </span>
@@ -525,6 +558,17 @@ function Workspace({
                 <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(1.25)} aria-label="Zoom in"><IconZoomIn /></button>
                 <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(0.8)} aria-label="Zoom out"><IconZoomOut /></button>
                 <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={resetView} aria-label="Reset view"><IconFit /></button>
+                <span className="tool-sep" aria-hidden="true" />
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" aria-pressed={tool === "pan"} onClick={() => setTool("pan")} aria-label="Pan and select tool" title="Pan / select">✋</button>
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" aria-pressed={tool === "draw"} onClick={() => setTool("draw")} aria-label="Draw tool (D)" title="Draw (D)"><IconEdit /></button>
+                {tool === "draw" ? (
+                  <select className="select btn-sm" style={{ height: 26 }} aria-label="Pen colour" value={penColor} onChange={(e) => setPenColor(e.target.value)}>
+                    {PEN_COLORS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                ) : null}
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" disabled={!strokeCount || !(strokes.current.get(round.id)?.length)}
+                  onClick={() => { strokes.current.delete(round.id); setStrokeCount((n) => n + 1); dirty.current = true; }}
+                  aria-label="Clear drawings on this round" title="Clear drawings"><IconClose /></button>
                 {map.floors.length > 1 ? (
                   <select className="select btn-sm" style={{ height: 26 }} aria-label="Floor" value={String(floor)}
                     onChange={(e) => setFloor(e.target.value === "auto" ? "auto" : Number(e.target.value))}>
@@ -621,6 +665,50 @@ function Workspace({
         isOwner={data.access.via === "owner"} viaShare={viaShare} teams={teams} replayTeamId={data.replay.teamId} visibility={data.replay.visibility} onChanged={reload} />
       <ShortcutsDialog open={kbdOpen} onClose={() => setKbdOpen(false)} />
     </div>
+  );
+}
+
+const PEN_COLORS = [
+  { label: "White", value: "#f3f6fa" },
+  { label: "Red", value: "#ff5d73" },
+  { label: "Green", value: "#7fd18b" },
+  { label: "Yellow", value: "#ffd84d" },
+];
+
+/** Score per half: regulation halves, then overtime in total. Each number carries the side that team played. */
+function HalfScores({ manifest }: { manifest: Manifest }) {
+  const groups: { label: string; rounds: RoundSummary[] }[] = [
+    { label: "1st half", rounds: manifest.rounds.filter((r) => !r.isOvertime && r.half === 1) },
+    { label: "2nd half", rounds: manifest.rounds.filter((r) => !r.isOvertime && r.half === 2) },
+    { label: "Overtime", rounds: manifest.rounds.filter((r) => r.isOvertime) },
+  ].filter((g) => g.rounds.length);
+  const won = (rs: RoundSummary[], k: "A" | "B") => rs.filter((r) => r.winner === k).length;
+  return (
+    <span className="half-scores faint" aria-label={groups.map((g) => `${g.label} ${won(g.rounds, "A")} to ${won(g.rounds, "B")}`).join(", ")}>
+      (
+      {groups.map((g, i) => (
+        <span key={g.label}>
+          {i ? "; " : ""}
+          {g.label === "Overtime" ? "OT " : ""}
+          <span className={`sidecol-${g.rounds[0].sides.A}`}>{won(g.rounds, "A")}</span>:<span className={`sidecol-${g.rounds[0].sides.B}`}>{won(g.rounds, "B")}</span>
+        </span>
+      ))}
+      )
+    </span>
+  );
+}
+
+function RenameTeam({ replayId, team, current, onDone }: { replayId: string; team: "A" | "B"; current: string; onDone: () => void }) {
+  return (
+    <button type="button" className="btn btn-ghost icon-btn btn-sm" aria-label={`Rename ${current}`} title="Rename team"
+      onClick={async () => {
+        const name = window.prompt(`Team name (leave empty to restore the name from the demo)`, current);
+        if (name === null) return;
+        await api(`/api/replays/${replayId}`, { method: "PATCH", json: team === "A" ? { teamAName: name.trim() || null } : { teamBName: name.trim() || null } });
+        onDone();
+      }}>
+      <IconEdit width={12} height={12} />
+    </button>
   );
 }
 

@@ -31,6 +31,8 @@ export interface ReplayRow {
   map_id: string | null;
   team_a_name: string | null;
   team_b_name: string | null;
+  team_a_override: string | null;
+  team_b_override: string | null;
   score_a: number | null;
   score_b: number | null;
   round_count: number | null;
