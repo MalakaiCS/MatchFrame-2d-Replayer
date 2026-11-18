@@ -6,7 +6,6 @@ __pycache__/
 .data/
 .env
 .env.local
-web/public/radars/*.png
 web/test-results/
 web/playwright-report/
 *.tsbuildinfo
