@@ -21,8 +21,12 @@ log = logging.getLogger(__name__)
 
 
 def _limits(mem: int):
+    """Bound the parser's address space. RLIMIT_AS limits *virtual* memory; Rust/Polars allocators can
+    reserve far more than they touch, so size it generously or set WORKER_PARSE_MEMORY_BYTES=0 and rely
+    on the container memory limit instead."""
     def apply():
-        resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
+        if mem > 0:
+            resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     return apply
 
