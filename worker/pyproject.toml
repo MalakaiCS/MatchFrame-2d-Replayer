@@ -1,0 +1,27 @@
+[project]
+name = "matchframe-worker"
+version = "0.1.0"
+description = "Matchframe2D Replayer demo parsing worker"
+requires-python = ">=3.11"
+dependencies = [
+  "awpy==3.3.0",
+  "polars==2.1.0",
+  "psycopg[binary]==3.3.9",
+  "boto3==1.44.5",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.2"]
+
+[project.scripts]
+matchframe-worker = "matchframe_worker.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["matchframe_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

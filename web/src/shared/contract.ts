@@ -1,0 +1,254 @@
+/**
+ * Replay data contract, schema version 1.
+ * The Python worker (worker/matchframe_worker/transform.py) produces these
+ * objects; the viewer consumes them. See docs/data-contract.md.
+ *
+ * Conventions
+ * - Demo ticks are the authoritative coordinate for playback and ordering.
+ * - Round windows are [startTick, endTick): endTick is exclusive and equals the
+ *   next round's startTick (or the last recorded tick + 1 for the final round).
+ * - Round-relative ms = round((tick - round.startTick) * tickIntervalMs), half-up.
+ * - Demo-time ms (used for audio alignment) = round(tick * tickIntervalMs).
+ */
+
+export const SCHEMA_VERSION = 1 as const;
+
+export type Side = "CT" | "T";
+export type TeamKey = "A" | "B";
+export type BuyType = "pistol" | "eco" | "semi_eco" | "semi_buy" | "full";
+
+export interface PlayerInfo {
+  /** Replay-local stable ID: "s:<steamid64>" for humans, "b:<n>" for bots or ambiguous IDs. */
+  id: string;
+  name: string;
+  steamId: string | null;
+  isBot: boolean;
+  team: TeamKey;
+}
+
+export interface TeamIdentity {
+  key: TeamKey;
+  name: string;
+  /** Where the name came from: the in-game clan tag, or a generated fallback label. */
+  nameSource: "clan" | "fallback";
+  startSide: Side;
+}
+
+export interface Capabilities {
+  clock: "countdown" | "elapsed";
+  participants: "all" | "partial";
+  health: boolean;
+  armor: boolean;
+  money: boolean;
+  inventory: boolean;
+  economy: boolean;
+  bombPosition: boolean;
+  utilityPaths: boolean;
+  utilityEffects: boolean;
+  smokeDisruption: "none" | "inferred" | "recorded";
+  floors: "single" | "rule-based";
+  viewAngles: boolean;
+}
+
+export interface TeamEconomy {
+  /** Team total equipment value at freeze end, or null if unknown. */
+  equipmentValue: number | null;
+  buyType: BuyType | null;
+  /** Buy type reported by the parser, recorded for comparison. */
+  parserBuyType: string | null;
+  players: number;
+}
+
+export interface RoundSummary {
+  id: string;
+  displayNumber: number;
+  startTick: number;
+  freezeEndTick: number | null;
+  /** Tick of round_end (winner decided), null if not recorded. */
+  decidedTick: number | null;
+  /** Exclusive. */
+  endTick: number;
+  sides: Record<TeamKey, Side>;
+  scoreBefore: Record<TeamKey, number>;
+  scoreAfter: Record<TeamKey, number>;
+  winner: TeamKey | null;
+  winnerSide: Side | null;
+  endReason: string | null;
+  durationMs: number;
+  half: number;
+  isOvertime: boolean;
+  isPistol: boolean;
+  /** First round of an overtime half (teams receive overtime money; not a pistol round). */
+  isOvertimeHalfStart: boolean;
+  economy: Record<TeamKey, TeamEconomy>;
+  /** POV / partial demos: share of the round each player has samples for (0..1). */
+  coverage: Record<string, number>;
+  bombPlanted: boolean;
+  payload: { key: string; bytes: number; sha256: string };
+}
+
+export interface Manifest {
+  schemaVersion: typeof SCHEMA_VERSION;
+  replayId: string;
+  revision: number;
+  parser: { name: string; version: string; worker: string; synthetic: boolean };
+  map: { id: string; displayName: string; registryVersion: string; calibration: string };
+  sourceType: "gotv" | "pov";
+  povPlayerId: string | null;
+  tickRate: number;
+  tickIntervalMs: number;
+  sampleEveryTicks: number;
+  teams: Record<TeamKey, TeamIdentity>;
+  players: PlayerInfo[];
+  timing: {
+    freezeTimeS: number | null;
+    roundTimeS: number | null;
+    bombTimerS: number | null;
+    source: "convars" | "defaults";
+    maxRounds: number;
+    overtimeMaxRounds: number;
+  };
+  capabilities: Capabilities;
+  series: { id: string; mapIndex: number } | null;
+  finalScore: Record<TeamKey, number>;
+  rounds: RoundSummary[];
+  excludedRounds: { reason: string; startTick: number; endTick: number | null }[];
+  warnings: string[];
+}
+
+/** Columnar per-player samples. Arrays are parallel and ordered by tick. */
+export interface PlayerTrack {
+  playerId: string;
+  t: number[];
+  x: number[];
+  y: number[];
+  z: number[];
+  yaw: number[];
+  alive: number[];
+  hp: number[] | null;
+  armor: number[] | null;
+  money: number[] | null;
+  /** Index into RoundPayload.weapons, -1 for none. */
+  weapon: number[] | null;
+  /** Bit flags: 1 bomb, 2 defuser, 4 helmet, 8 defusing, 16 planting, 32 scoped, 64 blinded. */
+  flags: number[];
+  /** Floor index into the map registry floors. */
+  floor: number[];
+  /** 1 when the sample must not be interpolated from the previous one. */
+  disc: number[];
+}
+
+export type EventType =
+  | "freeze_end"
+  | "kill"
+  | "bomb_plant_begin"
+  | "bomb_plant"
+  | "bomb_defuse_begin"
+  | "bomb_defuse"
+  | "bomb_explode"
+  | "bomb_drop"
+  | "bomb_pickup"
+  | "grenade_throw"
+  | "grenade_detonate"
+  | "smoke_disrupted"
+  | "round_end"
+  | "disconnect"
+  | "reconnect";
+
+export interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface GameEvent {
+  id: string;
+  tick: number;
+  /** Deterministic order within the tick. */
+  order: number;
+  type: EventType;
+  actor?: string | null;
+  target?: string | null;
+  assister?: string | null;
+  weapon?: string | null;
+  headshot?: boolean;
+  wallbang?: boolean;
+  throughSmoke?: boolean;
+  noscope?: boolean;
+  attackerBlind?: boolean;
+  position?: Vec3 | null;
+  actorPosition?: Vec3 | null;
+  site?: string | null;
+  grenadeId?: string | null;
+  reason?: string | null;
+  provenance: "recorded" | "inferred";
+}
+
+export type BombState = "carried" | "dropped" | "planting" | "planted" | "defusing" | "defused" | "exploded" | "unknown";
+
+export interface BombTransition {
+  tick: number;
+  state: BombState;
+  carrier: string | null;
+  /** Omitted (null) when the source does not record an exact location. */
+  position: Vec3 | null;
+  site: string | null;
+  provenance: "recorded" | "inferred";
+}
+
+export type GrenadeType = "smoke" | "flash" | "he" | "molotov" | "incendiary" | "decoy";
+
+export interface Grenade {
+  id: string;
+  type: GrenadeType;
+  throwerId: string | null;
+  throwTick: number;
+  detonateTick: number | null;
+  /** [tick, x, y, z] in order. Empty when only detonation was observed (no invented path). */
+  path: [number, number, number, number][];
+  detonation: Vec3 | null;
+}
+
+export interface Effect {
+  id: string;
+  kind: "smoke" | "fire" | "flash" | "he" | "decoy";
+  grenadeId: string | null;
+  throwerId: string | null;
+  startTick: number;
+  /** Exclusive. Null when the end was not recorded (effect lasts to round end). */
+  endTick: number | null;
+  position: Vec3;
+  radius: number;
+  radiusSource: "configured-estimate" | "recorded";
+  disruptions: { startTick: number; endTick: number; position: Vec3; radius: number; provenance: "inferred" | "recorded" }[];
+}
+
+export interface InventoryChange {
+  tick: number;
+  playerId: string;
+  items: string[];
+}
+
+export interface RoundPayload {
+  schemaVersion: typeof SCHEMA_VERSION;
+  roundId: string;
+  startTick: number;
+  endTick: number;
+  sampleEveryTicks: number;
+  weapons: string[];
+  tracks: PlayerTrack[];
+  events: GameEvent[];
+  bomb: BombTransition[];
+  grenades: Grenade[];
+  effects: Effect[];
+  inventory: InventoryChange[];
+}
+
+export function tickToRoundMs(tick: number, round: { startTick: number }, tickIntervalMs: number): number {
+  return Math.round((tick - round.startTick) * tickIntervalMs);
+}
+
+export function roundMsToTick(ms: number, round: { startTick: number; endTick: number }, tickIntervalMs: number): number {
+  const t = round.startTick + Math.round(ms / tickIntervalMs);
+  return Math.min(Math.max(t, round.startTick), round.endTick - 1);
+}

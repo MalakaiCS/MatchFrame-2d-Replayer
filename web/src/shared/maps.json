@@ -1,0 +1,122 @@
+{
+  "registryVersion": "2026.11.1",
+  "notes": "World->radar transform: px = (x - originX) / scale, py = (originY - y) / scale, in original radar image pixels (imageSize x imageSize). Origin and scale are the published CS2 overview values for each map. Status 'calibrated-unverified' means the values are configured but have not yet passed the three-landmark-per-floor check (docs/replayer-parity.md, MAP-*). No radar images are shipped; see docs/assets-and-licences.md.",
+  "maps": {
+    "de_mirage": {
+      "displayName": "Mirage",
+      "status": "calibrated-unverified",
+      "imageSize": 1024,
+      "originX": -3230,
+      "originY": 1713,
+      "scale": 5.0,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [{ "id": "main", "label": "Main" }],
+      "landmarks": []
+    },
+    "de_dust2": {
+      "displayName": "Dust II",
+      "status": "calibrated-unverified",
+      "imageSize": 1024,
+      "originX": -2476,
+      "originY": 3239,
+      "scale": 4.4,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [{ "id": "main", "label": "Main" }],
+      "landmarks": []
+    },
+    "de_nuke": {
+      "displayName": "Nuke",
+      "status": "calibrated-unverified",
+      "imageSize": 1024,
+      "originX": -3453,
+      "originY": 2887,
+      "scale": 7.0,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [
+        { "id": "upper", "label": "Upper" },
+        { "id": "lower", "label": "Lower", "zMax": -495, "imageSuffix": "_lower" }
+      ],
+      "floorUncertaintyBand": 40,
+      "landmarks": []
+    },
+    "de_inferno": {
+      "displayName": "Inferno",
+      "status": "unverified",
+      "imageSize": 1024,
+      "originX": -2087,
+      "originY": 3870,
+      "scale": 4.9,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [{ "id": "main", "label": "Main" }],
+      "landmarks": []
+    },
+    "de_ancient": {
+      "displayName": "Ancient",
+      "status": "unverified",
+      "imageSize": 1024,
+      "originX": -2953,
+      "originY": 2164,
+      "scale": 5.0,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [{ "id": "main", "label": "Main" }],
+      "landmarks": []
+    },
+    "de_anubis": {
+      "displayName": "Anubis",
+      "status": "unverified",
+      "imageSize": 1024,
+      "originX": -2796,
+      "originY": 3328,
+      "scale": 5.22,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [{ "id": "main", "label": "Main" }],
+      "landmarks": []
+    },
+    "de_overpass": {
+      "displayName": "Overpass",
+      "status": "unverified",
+      "imageSize": 1024,
+      "originX": -4831,
+      "originY": 1781,
+      "scale": 5.2,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [{ "id": "main", "label": "Main" }],
+      "landmarks": []
+    },
+    "de_train": {
+      "displayName": "Train",
+      "status": "unverified",
+      "imageSize": 1024,
+      "originX": -2308,
+      "originY": 2078,
+      "scale": 4.082077,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [{ "id": "main", "label": "Main" }],
+      "landmarks": []
+    },
+    "de_vertigo": {
+      "displayName": "Vertigo",
+      "status": "unverified",
+      "imageSize": 1024,
+      "originX": -3168,
+      "originY": 1762,
+      "scale": 4.0,
+      "rotationDeg": 0,
+      "assetVersion": "none",
+      "floors": [
+        { "id": "upper", "label": "Upper" },
+        { "id": "lower", "label": "Lower", "zMax": 11700, "imageSuffix": "_lower" }
+      ],
+      "floorUncertaintyBand": 40,
+      "landmarks": []
+    }
+  }
+}
