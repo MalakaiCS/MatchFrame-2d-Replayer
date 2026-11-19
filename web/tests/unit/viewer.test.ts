@@ -264,3 +264,20 @@ describe("audio sync", () => {
     expect(decide({ ...base, tick: t, currentTime: 20, playing: false }).play).toBe(false);
   });
 });
+
+import { trailsAt as trailsAtFn, indexRound as indexRoundFn, frameAt as frameAtFn } from "@/viewer/playback";
+describe("movement trails", () => {
+  it("returns the last seconds of movement for alive players, ending at the current position", () => {
+    const payload = {
+      startTick: 0, endTick: 1000, sampleEveryTicks: 64, weapons: [], events: [], bomb: [], grenades: [], effects: [], inventory: [],
+      tracks: [{
+        playerId: "p", t: [0, 64, 128, 192, 256], x: [0, 10, 20, 30, 40], y: [0, 0, 0, 0, 0], z: [0, 0, 0, 0, 0], yaw: [0, 0, 0, 0, 0],
+        alive: [1, 1, 1, 1, 1], hp: null, armor: null, money: null, weapon: null, flags: [0, 0, 0, 0, 0], floor: [0, 0, 0, 0, 0], disc: [0, 0, 0, 0, 0],
+      }],
+    } as never;
+    const idx = indexRoundFn(payload);
+    const tick = 224;
+    const tr = trailsAtFn(idx, tick, 128, frameAtFn(idx, tick)).get("p")!;
+    expect(tr.pts.map((p) => p[0])).toEqual([20, 30, 35]);
+  });
+});

@@ -241,3 +241,28 @@ export function nextEvent(events: GameEvent[], tick: number, dir: 1 | -1, types?
   for (let i = list.length - 1; i >= 0; i--) if (list[i].tick < tick) return list[i];
   return null;
 }
+
+/**
+ * Recent movement for each alive player: recorded samples in (tick - windowTicks, tick], plus the
+ * current position. Gaps (disconnects, deaths, floor changes) end a trail rather than bridging it.
+ */
+export function trailsAt(idx: RoundIndex, tick: number, windowTicks: number, frame: Frame): Map<string, { pts: [number, number][]; floor: number }> {
+  const out = new Map<string, { pts: [number, number][]; floor: number }>();
+  const now = new Map(frame.players.map((p) => [p.id, p]));
+  for (const tr of idx.payload.tracks) {
+    const cur = now.get(tr.playerId);
+    if (!cur || !cur.alive || !cur.visible) continue;
+    const end = bisectRight(tr.t, tick);
+    if (end < 0) continue;
+    const pts: [number, number][] = [];
+    for (let i = end; i >= 0 && tick - tr.t[i] <= windowTicks; i--) {
+      if (!tr.alive[i] || tr.floor[i] !== cur.floor) break;
+      pts.push([tr.x[i], tr.y[i]]);
+      if (tr.disc[i]) break;
+    }
+    pts.reverse();
+    pts.push([cur.x, cur.y]);
+    if (pts.length > 1) out.set(tr.playerId, { pts, floor: cur.floor });
+  }
+  return out;
+}

@@ -1,6 +1,6 @@
 import { replayAccess, requireUser } from "@/lib/access";
 import { badRequest, json, notFound, route } from "@/lib/http";
-import { insightsFor, type InsightFilter, type Layer, type NadePoint, type Point, selectPoints } from "@/lib/insights";
+import { insightsFor, type InsightFilter, type Layer, type NadePoint, type Point, selectPoints, WEAPON_GROUPS } from "@/lib/insights";
 import { indexedReplays, teamKey } from "@/lib/statIndex";
 import { statReplays } from "@/lib/statQuery";
 import type { GrenadeType, TeamKey } from "@/shared/contract";
@@ -25,9 +25,13 @@ function filterFrom(u: URL): InsightFilter {
     const v = Number(u.searchParams.get(k));
     return u.searchParams.has(k) && Number.isFinite(v) ? v : d;
   };
+  const weapon = u.searchParams.get("weapon");
+  if (weapon && !WEAPON_GROUPS[weapon]) throw badRequest("Unknown weapon group.");
+  const rounds = u.searchParams.get("rounds");
+  if (rounds && !["pistol", "gun", "eco", "half_buy", "full_buy"].includes(rounds)) throw badRequest("Unknown round filter.");
   return {
     layer, side: side as InsightFilter["side"], from: num("from", 0), to: num("to", 10_000),
-    player: u.searchParams.get("player") || null, nadeType: (type as GrenadeType) || null,
+    player: u.searchParams.get("player") || null, nadeType: (type as GrenadeType) || null, weapon: weapon || null, rounds: rounds || null,
   };
 }
 

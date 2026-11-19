@@ -36,6 +36,8 @@ export interface DrawOptions {
   showUtility: boolean;
   showDeaths: boolean;
   strokes?: Stroke[];
+  /** Recent movement per player (world coordinates), drawn as fading lines. */
+  moves?: Map<string, { pts: [number, number][]; floor: number }>;
   /** Panel origin (CSS px) when several floors are drawn side by side. */
   offsetX?: number;
   /** Side-by-side mode: draw only what is on `floor` (no hollow off-floor markers). */
@@ -273,6 +275,28 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+  }
+
+  // --- movement trails (behind the players)
+  if (o.moves) {
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const [pid, m] of o.moves) {
+      const info = o.players.get(pid);
+      if (!info || (o.hideOffFloor && !onFloor(m.floor))) continue;
+      const pts = m.pts.map(([x, y]) => toScreen(x, y));
+      const n = pts.length;
+      for (let i = 1; i < n; i++) {
+        ctx.globalAlpha = (0.08 + 0.55 * (i / (n - 1))) * (onFloor(m.floor) ? 1 : 0.4);
+        ctx.strokeStyle = COLORS[info.side];
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+        ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   // --- players (alive and visible)

@@ -50,4 +50,23 @@ describe("insights", () => {
     expect(out.nades).toHaveLength(1);
     expect(out.nades[0]).toMatchObject({ lx: 520, roundId: "r01", won: true, ms: 13_000 });
   });
+
+  it("filters kills by weapon group and rounds by pistol / buy", () => {
+    const m2 = { ...m, rounds: [{ ...(m.rounds[0] as object), isPistol: true, economy: { A: { buyType: "pistol" }, B: { buyType: "pistol" } } }] } as unknown as Manifest;
+    const ins2 = buildInsights(m2, new Map([["r01", payload]]));
+    const awp = bag();
+    selectPoints(ins2, "rep", "B", { ...all, layer: "kills", weapon: "awp" }, awp);
+    expect(awp.points).toHaveLength(0);
+    const rifles = bag();
+    selectPoints(ins2, "rep", "B", { ...all, layer: "kills", weapon: "rifles" }, rifles);
+    expect(rifles.points).toHaveLength(1);
+    const pistol = bag();
+    selectPoints(ins2, "rep", "A", { ...all, rounds: "pistol" }, pistol);
+    expect(pistol.points.length).toBeGreaterThan(0);
+    const gun = bag();
+    selectPoints(ins2, "rep", "A", { ...all, rounds: "gun" }, gun);
+    expect(gun.points).toHaveLength(0);
+    expect(ins2.v).toBe(2);
+  });
 });
+

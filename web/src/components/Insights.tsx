@@ -68,6 +68,8 @@ export function InsightsPanel({ source }: { source: InsightsSource }) {
   const [time, setTime] = useState("all");
   const [player, setPlayer] = useState("");
   const [nadeType, setNadeType] = useState<GrenadeType | "">("smoke");
+  const [weapon, setWeapon] = useState("");
+  const [rounds, setRounds] = useState("");
   const [floor, setFloor] = useState(0);
   const [data, setData] = useState<Resp | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +78,12 @@ export function InsightsPanel({ source }: { source: InsightsSource }) {
 
   const t = TIMES.find((x) => x.id === time)!;
   const qs = useMemo(() => {
-    const p = new URLSearchParams({ layer, side, from: String(t.from), to: String(t.to), ...(player ? { player } : {}), ...(layer === "nades" && nadeType ? { type: nadeType } : {}) });
+    const p = new URLSearchParams({ layer, side, from: String(t.from), to: String(t.to), ...(player ? { player } : {}), ...(layer === "nades" && nadeType ? { type: nadeType } : {}),
+      ...((layer === "kills" || layer === "deaths") && weapon ? { weapon } : {}), ...(rounds ? { rounds } : {}) });
     if (source.kind === "replay") { p.set("replay", source.replayId); p.set("team", team); return p.toString(); }
     p.set("name", source.name); p.set("map", source.map);
     return `${p}&${source.spaceQs}`;
-  }, [layer, side, t, player, nadeType, source, team]);
+  }, [layer, side, t, player, nadeType, weapon, rounds, source, team]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +144,23 @@ export function InsightsPanel({ source }: { source: InsightsSource }) {
           <option value="">Whole team</option>
           {data?.players.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
         </select>
+        <select className="select btn-sm" style={{ height: 28 }} aria-label="Rounds" value={rounds} onChange={(e) => setRounds(e.target.value)}>
+          <option value="">All rounds</option>
+          <option value="pistol">Pistol rounds</option>
+          <option value="gun">Gun rounds</option>
+          <option value="eco">Their eco rounds</option>
+          <option value="half_buy">Their half buys</option>
+          <option value="full_buy">Their full buys</option>
+        </select>
+        {layer === "kills" || layer === "deaths" ? (
+          <select className="select btn-sm" style={{ height: 28 }} aria-label={layer === "kills" ? "Kill weapon" : "Killed by weapon"} value={weapon} onChange={(e) => setWeapon(e.target.value)}>
+            <option value="">{layer === "kills" ? "Any weapon" : "Killed by any weapon"}</option>
+            <option value="awp">{layer === "kills" ? "AWP kills" : "Killed by AWP"}</option>
+            <option value="rifles">Rifles</option>
+            <option value="smgs">SMGs</option>
+            <option value="pistols">Pistols</option>
+          </select>
+        ) : null}
         {map && map.floors.length > 1 ? (
           <select className="select btn-sm" style={{ height: 28 }} aria-label="Floor" value={floor} onChange={(e) => setFloor(Number(e.target.value))}>
             {map.floors.map((f, i) => <option key={f.id} value={i}>{f.label} floor</option>)}
@@ -276,9 +296,9 @@ function RadarCanvas({ map, floor, layer, points, clusters, selected }: {
       const id = o.createImageData(G, G);
       for (let i = 0; i < dens.length; i++) {
         const a = Math.min(1, dens[i] / top);
-        if (a < 0.03) continue;
+        if (a < 0.06) continue;
         const [R, Gc, B] = palette(a);
-        id.data[i * 4] = R; id.data[i * 4 + 1] = Gc; id.data[i * 4 + 2] = B; id.data[i * 4 + 3] = Math.round((0.35 + 0.6 * a) * 255);
+        id.data[i * 4] = R; id.data[i * 4 + 1] = Gc; id.data[i * 4 + 2] = B; id.data[i * 4 + 3] = Math.round(Math.min(1, a * 1.5) * 225);
       }
       o.putImageData(id, 0, 0);
       ctx.imageSmoothingEnabled = true;

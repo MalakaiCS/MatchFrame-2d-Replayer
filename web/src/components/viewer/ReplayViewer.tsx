@@ -9,7 +9,7 @@ import { clockAt } from "@/viewer/clock";
 import { drawFrame, drawSplit, panelWidth, playerAtPoint, type Stroke } from "@/viewer/draw";
 import { filterRounds, filtersFromParam, filtersToParam, type RoundFilters } from "@/viewer/filters";
 import { getMapDef, mapName, screenToImage, type Viewport, worldToImage, zoomAt } from "@/viewer/maps";
-import { frameAt, inventoryAt, nextEvent, type Frame, type RoundIndex } from "@/viewer/playback";
+import { frameAt, inventoryAt, nextEvent, trailsAt, type Frame, type RoundIndex } from "@/viewer/playback";
 import { RoundCache } from "@/viewer/roundCache";
 import { buildReplayUrl, resolveMoment, shareTokenFromHash } from "@/viewer/shareUrl";
 import { api, ApiError, setShareToken } from "../api";
@@ -153,7 +153,7 @@ function Workspace({
   const [autoplay, setAutoplay] = useState(true);
   // Freeze time is skipped by default and left off the timeline.
   const [skipFreeze, setSkipFreeze] = useState(true);
-  const [toggles, setToggles] = useState({ names: true, trails: true, utility: true, deaths: true });
+  const [toggles, setToggles] = useState({ names: true, moves: false, trails: true, utility: true, deaths: true });
   const [dockTab, setDockTab] = useState<DockTab>("events");
   // The review drawer (events, notes, bookmarks, playlists, comms) sits beside the scoreboards; closed by default.
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -416,6 +416,7 @@ function Workspace({
           map, viewport: viewport.current, width: w, height: h, dpr, frame, players: playersRef.current, selected: o.selected,
           showNames: o.toggles.names, showTrails: o.toggles.trails, showUtility: o.toggles.utility, showDeaths: o.toggles.deaths,
           strokes: strokes.current.get(r.id), mutedRadar: o.mutedRadar,
+          moves: o.toggles.moves ? trailsAt(idx, tickRef.current, Math.round(3 * manifest.tickRate), frame) : undefined,
         };
         if (o.floor === "split") {
           const floors = map.floors.map((_, i) => i);
@@ -654,7 +655,7 @@ function Workspace({
               <details className="tool-pop">
                 <summary className="btn btn-ghost icon-btn btn-sm" aria-label="Display settings" title="Display settings"><IconLayers /></summary>
                 <div className="tool-menu card">
-                  {([["names", "Player names"], ["trails", "Grenade paths"], ["utility", "Utility"], ["deaths", "Death markers"]] as const).map(([k, l]) => (
+                  {([["names", "Player names"], ["moves", "Movement trails (3 s)"], ["trails", "Grenade paths"], ["utility", "Utility"], ["deaths", "Death markers"]] as const).map(([k, l]) => (
                     <label key={k} className="row"><input type="checkbox" checked={toggles[k]} onChange={(e) => setToggles({ ...toggles, [k]: e.target.checked })} /> {l}</label>
                   ))}
                   <label className="row"><input type="checkbox" checked={mutedRadar} onChange={(e) => setMutedRadar(e.target.checked)} /> Muted radar</label>

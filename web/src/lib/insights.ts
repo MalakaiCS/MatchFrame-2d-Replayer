@@ -10,18 +10,34 @@
  */
 import { gunzipSync } from "node:zlib";
 import type { GrenadeType, Manifest, RoundPayload, Side, TeamKey } from "@/shared/contract";
+import { normalizeBuyType } from "@/shared/contract";
 import { q, q1 } from "./db";
 import { loadManifest } from "./manifest";
 import { getStorage } from "./storage";
 
 export const POS_STEP_S = 2;
+/** Bump when the shape changes; older cached insights are rebuilt. */
+export const INSIGHTS_VERSION = 2;
+
+/** Weapon groups for the kill/death filters. */
+export const WEAPON_GROUPS: Record<string, string[]> = {
+  awp: ["awp"],
+  rifles: ["ak47", "m4a1", "m4a1_silencer", "m4a4", "galilar", "famas", "aug", "sg556", "ssg08", "scar20", "g3sg1"],
+  smgs: ["mac10", "mp9", "mp7", "mp5sd", "ump45", "p90", "bizon"],
+  pistols: ["glock", "usp_silencer", "hkp2000", "p250", "fiveseven", "tec9", "cz75a", "deagle", "elite", "revolver"],
+};
+const weaponKey = (w: string | null) => (w ?? "").toLowerCase().replace(/^weapon_/, "");
 
 export interface Insights {
-  v: 1;
+  v: number;
   mapId: string;
   tickMs: number;
   players: { id: string; name: string; team: TeamKey; steamId: string | null }[];
-  rounds: { id: string; n: number; sides: Record<TeamKey, Side>; winner: TeamKey | null; freeze: number; startTick: number }[];
+  rounds: {
+    id: string; n: number; sides: Record<TeamKey, Side>; winner: TeamKey | null; freeze: number; startTick: number;
+    /** Pistol round, and each team's buy (pistol / eco / half_buy / full_buy / null). */
+    pistol: boolean; buy: Record<TeamKey, string | null>;
+  }[];
   /** Columnar: round index, player index, seconds since freeze end, x, y, z (rounded). */
   pos: { r: number[]; p: number[]; s: number[]; x: number[]; y: number[]; z: number[] };
   kills: { r: number; s: number; k: number; v: number; kx: number | null; ky: number | null; kz: number | null; vx: number; vy: number; vz: number; w: string | null; hs: boolean }[];
@@ -35,8 +51,11 @@ export function buildInsights(m: Manifest, payloads: Map<string, RoundPayload>):
   const players = m.players.map((p) => ({ id: p.id, name: p.name, team: p.team, steamId: p.steamId ?? null }));
   const pIdx = new Map(players.map((p, i) => [p.id, i]));
   const out: Insights = {
-    v: 1, mapId: m.map.id, tickMs: m.tickIntervalMs, players,
-    rounds: m.rounds.map((r) => ({ id: r.id, n: r.displayNumber, sides: r.sides, winner: r.winner, freeze: r.freezeEndTick ?? r.startTick, startTick: r.startTick })),
+    v: INSIGHTS_VERSION, mapId: m.map.id, tickMs: m.tickIntervalMs, players,
+    rounds: m.rounds.map((r) => ({
+      id: r.id, n: r.displayNumber, sides: r.sides, winner: r.winner, freeze: r.freezeEndTick ?? r.startTick, startTick: r.startTick,
+      pistol: r.isPistol, buy: { A: normalizeBuyType(r.economy?.A?.buyType), B: normalizeBuyType(r.economy?.B?.buyType) },
+    })),
     pos: { r: [], p: [], s: [], x: [], y: [], z: [] },
     kills: [],
     nades: [],
@@ -102,7 +121,7 @@ async function loadPayloads(prefix: string, m: Manifest): Promise<Map<string, Ro
 /** Insights for a ready replay, built on first use and cached per revision. */
 export async function insightsFor(row: { id: string; published_revision: number; published_prefix: string }): Promise<Insights> {
   const hit = await q1<{ revision: number; data: Insights }>("select revision, data from replay_insights where replay_id = $1", [row.id]);
-  if (hit && hit.revision === row.published_revision) return hit.data;
+  if (hit && hit.revision === row.published_revision && hit.data.v === INSIGHTS_VERSION) return hit.data;
   const m = await loadManifest(row.published_prefix);
   const data = buildInsights(m, await loadPayloads(row.published_prefix, m));
   await q(
@@ -123,6 +142,10 @@ export interface InsightFilter {
   /** Player key (steam id or player id); null = whole team. */
   player: string | null;
   nadeType: GrenadeType | null;
+  /** Kills/deaths: only with this weapon group (see WEAPON_GROUPS). */
+  weapon?: string | null;
+  /** Rounds: "pistol", "gun" (not pistol), or this team's buy ("eco", "half_buy", "full_buy"). */
+  rounds?: string | null;
 }
 
 export interface Point { x: number; y: number; z: number }
@@ -135,7 +158,16 @@ export interface NadePoint {
 export function selectPoints(ins: Insights, replayId: string, team: TeamKey, f: InsightFilter, out: { points: Point[]; nades: NadePoint[] }) {
   const key = (i: number) => ins.players[i].steamId ?? ins.players[i].id;
   const sideOf = (ri: number) => ins.rounds[ri].sides[team];
-  const okRound = (ri: number) => f.side === "all" || sideOf(ri) === f.side;
+  const okRound = (ri: number) => {
+    if (f.side !== "all" && sideOf(ri) !== f.side) return false;
+    const rd = ins.rounds[ri];
+    if (!f.rounds || rd.pistol === undefined) return true;
+    if (f.rounds === "pistol") return rd.pistol;
+    if (f.rounds === "gun") return !rd.pistol;
+    return !rd.pistol && rd.buy[team] === f.rounds;
+  };
+  const group = f.weapon ? WEAPON_GROUPS[f.weapon] ?? [] : null;
+  const okWeapon = (w: string | null) => !group || group.includes(weaponKey(w));
   const okPlayer = (pi: number) => pi >= 0 && ins.players[pi].team === team && (!f.player || key(pi) === f.player);
   const okTime = (s: number) => s >= f.from && s <= f.to;
   if (f.layer === "pos") {
@@ -145,11 +177,11 @@ export function selectPoints(ins: Insights, replayId: string, team: TeamKey, f: 
     }
   } else if (f.layer === "kills") {
     for (const k of ins.kills) {
-      if (k.kx !== null && okRound(k.r) && okPlayer(k.k) && okTime(k.s) && ins.players[k.v].team !== team) out.points.push({ x: k.kx, y: k.ky!, z: k.kz! });
+      if (k.kx !== null && okRound(k.r) && okPlayer(k.k) && okTime(k.s) && okWeapon(k.w) && ins.players[k.v].team !== team) out.points.push({ x: k.kx, y: k.ky!, z: k.kz! });
     }
   } else if (f.layer === "deaths") {
     for (const k of ins.kills) {
-      if (okRound(k.r) && okPlayer(k.v) && okTime(k.s)) out.points.push({ x: k.vx, y: k.vy, z: k.vz });
+      if (okRound(k.r) && okPlayer(k.v) && okTime(k.s) && okWeapon(k.w)) out.points.push({ x: k.vx, y: k.vy, z: k.vz });
     }
   } else {
     for (const n of ins.nades) {
