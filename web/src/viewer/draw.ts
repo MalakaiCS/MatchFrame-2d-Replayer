@@ -3,7 +3,8 @@
  * radar-image pixels first (maps.ts), then through the viewport (pan/zoom),
  * then scaled by devicePixelRatio.
  *
- * Side markers pair colour with shape: CT = circle, T = triangle. Off-floor
+ * Players are circles coloured by side (CT cyan, T amber) with a view cone and
+ * a pointer showing where they look. Off-floor
  * players are drawn hollow with an up/down glyph. Estimated smoke and fire
  * areas are drawn as soft clouds and labelled "est." at high zoom.
  */
@@ -286,23 +287,30 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
     if (off && o.hideOffFloor) continue;
     const r = 7;
     ctx.globalAlpha = off ? 0.45 : 1;
-    // view direction
+    // view direction: soft "scanning" cone plus a pointer on the rim
     const a = yawToCanvas(map, p.yaw);
+    const cone = ctx.createRadialGradient(px, py, r, px, py, r + 26);
+    cone.addColorStop(0, info.side === "CT" ? "rgba(56,198,232,0.38)" : "rgba(242,169,59,0.38)");
+    cone.addColorStop(1, info.side === "CT" ? "rgba(56,198,232,0)" : "rgba(242,169,59,0)");
     ctx.beginPath();
     ctx.moveTo(px, py);
-    ctx.arc(px, py, r + 13, a - 0.38, a + 0.38);
+    ctx.arc(px, py, r + 26, a - 0.42, a + 0.42);
     ctx.closePath();
-    ctx.fillStyle = info.side === "CT" ? "rgba(56,198,232,0.22)" : "rgba(242,169,59,0.22)";
+    ctx.fillStyle = cone;
     ctx.fill();
-    // body: CT circle, T triangle
+    // pointer: a small triangle just outside the circle, aimed where the player is looking
+    const tip = r + 6;
+    const base = r + 0.5;
     ctx.beginPath();
-    if (info.side === "CT") ctx.arc(px, py, r, 0, Math.PI * 2);
-    else {
-      ctx.moveTo(px, py - r - 1);
-      ctx.lineTo(px + r + 0.5, py + r - 1);
-      ctx.lineTo(px - r - 0.5, py + r - 1);
-      ctx.closePath();
-    }
+    ctx.moveTo(px + Math.cos(a) * tip, py + Math.sin(a) * tip);
+    ctx.lineTo(px + Math.cos(a + 0.55) * base, py + Math.sin(a + 0.55) * base);
+    ctx.lineTo(px + Math.cos(a - 0.55) * base, py + Math.sin(a - 0.55) * base);
+    ctx.closePath();
+    ctx.fillStyle = off ? "rgba(243,246,250,0.5)" : "#f3f6fa";
+    ctx.fill();
+    // body: a circle for both sides; colour separates CT (cyan) from T (amber)
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
     if (off) {
       ctx.strokeStyle = col;
       ctx.lineWidth = 2;
@@ -321,7 +329,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
     }
     if (p.id === o.selected) {
       ctx.beginPath();
-      ctx.arc(px, py, r + 5, 0, Math.PI * 2);
+      ctx.arc(px, py, r + 9, 0, Math.PI * 2);
       ctx.strokeStyle = "#f3f6fa";
       ctx.lineWidth = 1.5;
       ctx.stroke();

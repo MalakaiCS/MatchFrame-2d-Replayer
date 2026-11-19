@@ -116,7 +116,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .side-CT { color: var(--ct); }
 .side-CT::before { background: var(--ct); border-radius: 50%; }
 .side-T { color: var(--t); }
-.side-T::before { background: var(--t); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.side-T::before { background: var(--t); border-radius: 50%; }
 
 /* ---------- auth ---------- */
 .auth { max-width: 380px; margin: 64px auto; }
