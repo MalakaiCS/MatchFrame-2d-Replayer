@@ -633,6 +633,7 @@ function Workspace({
         {manifest.parser.synthetic ? <span className="badge badge-warn">Synthetic fixture</span> : null}
         {viaShare ? <span className="badge">{roundOnly ? `Round link · round ${round.displayNumber} only` : "Read-only link"}</span> : null}
         <span className="faint" style={{ fontSize: 12 }}>Final {manifest.finalScore.A}–{manifest.finalScore.B}</span>
+        {!roundOnly ? <Link className="btn btn-sm" href={`/replays/${id}/stats${shareToken ? `#s=${shareToken}` : ""}`}>Stats</Link> : null}
         <button type="button" className="btn btn-sm" aria-pressed={reviewOpen} aria-expanded={reviewOpen} aria-controls="review-drawer"
           onClick={() => setReviewOpen((v) => !v)}>Review{review.notes.length + review.bookmarks.length ? ` (${review.notes.length + review.bookmarks.length})` : ""}</button>
         <button type="button" className="btn btn-ghost icon-btn" onClick={() => setKbdOpen(true)} aria-label="Keyboard shortcuts"><IconKeyboard /></button>

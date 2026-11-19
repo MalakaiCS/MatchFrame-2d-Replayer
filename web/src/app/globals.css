@@ -468,3 +468,45 @@ dialog.modal h2 { margin: 0 0 12px; font-size: 17px; }
 .space-switch a { padding: 6px 16px; border-radius: 6px; text-decoration: none; color: var(--text-dim); font-weight: 600; font-size: 14px; }
 .space-switch a:hover { color: var(--text); }
 .space-switch a[aria-current="page"] { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+/* ---------- match stats page ---------- */
+.ms-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.ms-eyebrow { margin: 0 0 4px; color: var(--text-faint); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+.ms-score { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 26px !important; }
+.ms-score .mono { font-size: 30px; }
+.ms-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 12px 0 16px; font-size: 13px; }
+.ms-teamcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.ms-teamcard h2 { margin: 0 0 10px; font-size: 16px; }
+.ms-teamcard dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; }
+.ms-teamcard dt { color: var(--text-faint); font-size: 12px; }
+.ms-teamcard dd { margin: 2px 0 0; font-family: var(--mono); font-size: 17px; font-weight: 700; }
+.ms-table-wrap { margin-bottom: 18px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--bg-raised); }
+.ms-table-wrap[data-side="CT"] { border-top: 2px solid var(--ct); }
+.ms-table-wrap[data-side="T"] { border-top: 2px solid var(--t); }
+.ms-table-title { margin: 0; padding: 10px 14px; font-size: 15px; border-bottom: 1px solid var(--border); }
+.ms-scroll { overflow-x: auto; }
+.ms-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ms-table th, .ms-table td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid rgba(38, 50, 65, 0.6); }
+.ms-table thead th { color: var(--text-faint); font-weight: 600; font-size: 12px; background: var(--bg-sunken); }
+.ms-table thead th button { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.ms-table thead th[aria-sort] { color: var(--text); }
+.ms-table .ms-name { text-align: left; font-weight: 650; }
+.ms-table tbody tr:hover { background: var(--panel); }
+.ms-pos { color: var(--ok); }
+.ms-neg { color: var(--danger); }
+.ms-multi { font-family: var(--mono); color: var(--text-dim); }
+.ms-rating { font-family: var(--mono); font-weight: 700; }
+.ms-rating[data-good="true"] { color: var(--ok); }
+.ms-rating[data-bad="true"] { color: var(--danger); }
+.ms-econ, .ms-rounds { margin-bottom: 18px; }
+.ms-econ h2, .ms-rounds h2 { margin: 0 0 10px; font-size: 16px; }
+.ms-econ svg a:hover rect { opacity: 1; }
+.ms-rounds ol { list-style: none; margin: 0; padding: 0; }
+.ms-round { display: grid; grid-template-columns: 36px 170px 140px 60px 170px 1fr; gap: 10px; align-items: center; padding: 7px 8px; border-radius: var(--radius-sm); text-decoration: none; font-size: 13px; }
+.ms-round:hover { background: var(--panel); }
+.ms-rn { color: var(--text-dim); }
+.ms-hl { color: var(--t); font-size: 12px; }
+@media (max-width: 900px) {
+  .ms-round { grid-template-columns: 30px 1fr 60px; }
+  .ms-round > :nth-child(3), .ms-round > :nth-child(5), .ms-round > :nth-child(6) { display: none; }
+}
