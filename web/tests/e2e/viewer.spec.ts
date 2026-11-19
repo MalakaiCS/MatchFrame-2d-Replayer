@@ -23,8 +23,15 @@ async function signIn(page: Page) {
   await page.goto(`${BASE}/login`);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("correct-horse-battery");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(/\/replays/);
+  // Sign-in is rate limited (3 per 10 s); fast tests can hit that, so wait it out and retry.
+  for (let attempt = 0; ; attempt++) {
+    await page.getByRole("button", { name: "Sign in" }).click();
+    const limited = page.getByText("Too many requests");
+    await Promise.race([page.waitForURL(/\/replays/), limited.waitFor()]);
+    if (/\/replays/.test(page.url())) return;
+    if (attempt >= 3) throw new Error("Sign-in stayed rate limited");
+    await page.waitForTimeout(10_000);
+  }
 }
 
 test("sign up, upload and process a demo", async ({ page }) => {

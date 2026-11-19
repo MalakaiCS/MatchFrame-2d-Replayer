@@ -3,6 +3,7 @@ import { badRequest, json, notFound, route } from "@/lib/http";
 import { insightsFor, type InsightFilter, type Layer, type NadePoint, type Point, selectPoints, WEAPON_GROUPS } from "@/lib/insights";
 import { indexedReplays, teamKey } from "@/lib/statIndex";
 import { statReplays } from "@/lib/statQuery";
+import { idsParam } from "@/lib/teamDemos";
 import type { GrenadeType, TeamKey } from "@/shared/contract";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +68,8 @@ export const GET = route(async (req: Request) => {
   const name = (u.searchParams.get("name") ?? "").trim();
   const map = (u.searchParams.get("map") ?? "").trim();
   if (!name || !map) throw badRequest("Give a team name and a map.");
-  const rows = (await statReplays(user, u)).filter((r) => r.map_id === map);
+  const ids = idsParam(u);
+  const rows = (await statReplays(user, u)).filter((r) => r.map_id === map && (!ids || ids.includes(r.id)));
   const { replays } = await indexedReplays(rows);
   const key = teamKey(name);
   const matched = replays

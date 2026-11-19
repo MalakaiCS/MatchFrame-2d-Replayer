@@ -620,3 +620,42 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
 
 .tb-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .tb-steps { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Anti-strat */
+.as-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.as-kpi { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; }
+.as-kpi strong { font-size: 22px; }
+.as-kpi span { font-size: 12px; }
+.as-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 12px; }
+.as-card { display: flex; gap: 14px; padding: 14px; align-items: flex-start; }
+.as-body { min-width: 0; flex: 1; }
+.as-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.as-title { font-size: 15px; margin: 0 0 8px; line-height: 1.35; }
+.as-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; margin-bottom: 6px; }
+.as-bar span { display: block; height: 100%; background: var(--accent, #7fd18b); }
+.as-detail { font-size: 12px; margin: 0 0 6px; }
+.as-counter { font-size: 13px; margin: 0 0 8px; }
+.as-ex { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; margin: 0; }
+.as-ex .chip { font-size: 11px; }
+.as-radar { position: relative; width: 132px; height: 132px; flex: none; border-radius: 6px; overflow: hidden; background: #080b0f; }
+.as-radar img { width: 100%; height: 100%; filter: grayscale(0.6) brightness(0.7); display: block; }
+.as-dot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.25), 0 0 12px rgba(255,255,255,0.6); }
+.as-dot.as-ct { background: var(--ct); box-shadow: 0 0 0 3px var(--ct-soft), 0 0 12px var(--ct); }
+.as-dot.as-t { background: var(--t); box-shadow: 0 0 0 3px rgba(242,169,59,0.2), 0 0 12px var(--t); }
+.badge.as-ct { color: var(--ct); }
+.badge.as-t { color: var(--t); }
+.as-noradar { width: 132px; height: 132px; flex: none; border-radius: 6px; display: grid; place-items: center; font-size: 40px; font-weight: 700; color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); }
+.as-ai { margin-bottom: 12px; }
+.as-brief ul { margin: 4px 0 10px; padding-left: 18px; }
+.as-brief li { margin-bottom: 4px; }
+@media (max-width: 560px) { .as-card { gap: 10px; padding: 12px; } .as-radar, .as-noradar { width: 84px; height: 84px; } .as-noradar { font-size: 28px; } }
+
+/* App nav: never wider than the screen; it scrolls sideways on phones. */
+.topnav { min-width: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+.topnav::-webkit-scrollbar { display: none; }
+.topbar > .wordmark, .topbar > .row { flex: none; }
+@media (max-width: 760px) {
+  .topbar { gap: 8px; padding: 0 10px; }
+  .topbar:not(.topbar-mk) .wordmark > span, .topbar:not(.topbar-mk) .row > .muted { display: none; }
+  .topbar:not(.topbar-mk) .topbar-spacer { display: none; }
+}

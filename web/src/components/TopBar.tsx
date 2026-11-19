@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { authClient } from "./auth-client";
 import { Wordmark } from "./icons";
 
@@ -9,6 +10,7 @@ const NAV = [
   { href: "/replays/team", label: "Team" },
   { href: "/replays/new", label: "Upload" },
   { href: "/stats", label: "Stats" },
+  { href: "/antistrat", label: "Anti-strat" },
   { href: "/tactics", label: "Boards" },
   { href: "/teams", label: "Teams" },
   { href: "/billing", label: "Plans" },
@@ -19,6 +21,13 @@ export function TopBar() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const site = path === "/";
+  const navRef = useRef<HTMLElement>(null);
+  // On narrow screens the nav scrolls sideways: keep the current page's link in view.
+  useEffect(() => {
+    const nav = navRef.current;
+    const cur = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav && cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - nav.clientWidth / 2 + cur.offsetWidth / 2;
+  }, [path, session]);
   return (
     <header className={site ? "topbar topbar-mk" : "topbar"}>
       <a href="#main" className="sr-only">Skip to content</a>
@@ -35,7 +44,7 @@ export function TopBar() {
           <a href="#faq">FAQ</a>
         </nav>
       ) : session ? (
-        <nav className="topnav" aria-label="Main">
+        <nav className="topnav" aria-label="Main" ref={navRef}>
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}>{n.label}</Link>
           ))}

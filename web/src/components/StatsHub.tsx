@@ -94,6 +94,7 @@ export function StatsHub() {
         <input id="team-search" className="input" placeholder="Search teams" value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 300 }} />
         <SpacePicker teams={teams} space={space} teamId={teamId} onChange={go} />
         <Link className="btn" href={`/stats/rounds?${qsKey}`}>Find rounds</Link>
+        <Link className="btn" href={`/antistrat?${qsKey}`}>Anti-strat</Link>
         <Link className="btn" href="/stats/me">My stats</Link>
       </div>
       {error ? <p className="alert alert-err" role="alert">{error}</p> : null}
@@ -172,6 +173,7 @@ export function TeamOverview() {
         <h1 style={{ margin: 0 }}>{d?.name ?? name}</h1>
         <div className="row no-print">
           {d ? <WatchButton name={d.name} watched={d.watched} /> : null}
+          {d ? <Link className="btn" href={`/antistrat?${new URLSearchParams({ name: d.name, ...(map ? { map } : {}) })}&${qsKey}`}>Find patterns</Link> : null}
           <button type="button" className="btn" onClick={() => window.print()} title="Print or save this page as a PDF scouting report">Scouting report</button>
           <Link className="btn" href={`/stats/rounds?${new URLSearchParams({ team: d?.name ?? name, ...(map ? { map } : {}) })}&${qsKey}`}>Find {d?.name ?? name}&apos;s rounds</Link>
           <SpacePicker teams={teams} space={space} teamId={teamId} onChange={(s, id) => router.replace(link({ space: s, teamId: id }))} />

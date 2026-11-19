@@ -147,3 +147,17 @@ choosing the same file again after a dropped connection continues with the missi
 - The worker aborts expired multipart uploads. As a safety net, add a bucket lifecycle rule that
   aborts incomplete multipart uploads after 2 days, if your provider supports it.
 - Tunables: `UPLOAD_MULTIPART_MIN_BYTES`, `UPLOAD_PART_BYTES` (at least 5 MiB), `RESUMABLE_UPLOAD_HOURS`.
+
+## Anti-strat AI brief (optional)
+
+The pattern finder (`/antistrat`) needs nothing extra. The "Write a game plan with AI" button
+appears only when `ANTHROPIC_API_KEY` is set on the web service.
+
+- What is sent: the computed patterns for the team (shares, counts, spot labels, player names,
+  rule-based counters). Demo files and positions are not sent.
+- Model: `claude-opus-5-5` by default (`ANTISTRAT_MODEL` to change it). Requests opt into
+  server-side refusal fallbacks (`server-side-fallback-2026-07-01`, `fallbacks: "default"`): if the
+  model declines, the API re-runs the request on a fallback model in the same call, billed at that
+  model's rates.
+- Each click is one API call (typically a few thousand input tokens and up to ~2,000 output tokens).
+  Briefs are not cached.

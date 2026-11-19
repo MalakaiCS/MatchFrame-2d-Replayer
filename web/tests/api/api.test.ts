@@ -632,3 +632,37 @@ describe("resumable uploads", () => {
   }, 180_000);
 });
 
+
+describe("pattern finder and anti-strat", () => {
+  it("scans a team's demos (automatic), a picked set (manual), and keeps others out", async () => {
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: `Scout ${run}`, teamBName: `Prey ${run}` } }, 200);
+    const qs = `name=${encodeURIComponent(`Scout ${run}`)}&map=de_mirage`;
+    const auto = await owner.json(`/api/antistrat?${qs}`, {}, 200);
+    expect(auto.list).toHaveLength(1);
+    expect(auto.list[0]).toMatchObject({ id: replayId, opponent: `Prey ${run}` });
+    expect(auto.report.demos).toBe(1);
+    expect(auto.report.rounds.T + auto.report.rounds.CT).toBe(manifest.rounds.length);
+    expect(Array.isArray(auto.report.patterns)).toBe(true);
+    for (const p of auto.report.patterns) {
+      expect(p.n).toBeLessThanOrEqual(p.of);
+      expect(["strong", "moderate", "weak"]).toContain(p.confidence);
+      for (const e of p.examples) expect(e.replayId).toBe(replayId);
+    }
+    expect(typeof auto.ai).toBe("boolean");
+    // Manual: only the picked demos are scanned; the list still shows them all.
+    const manual = await owner.json(`/api/antistrat?${qs}&ids=${replayId}`, {}, 200);
+    expect(manual.report.demos).toBe(1);
+    const none = await owner.json(`/api/antistrat?${qs}&ids=someone-else`, {}, 200);
+    expect(none.report.demos).toBe(0);
+    expect(none.list).toHaveLength(1);
+    // Heatmaps follow the manual pick too.
+    expect((await owner.json(`/api/insights?${qs}&layer=pos&ids=${replayId}`, {}, 200)).demos).toBe(1);
+    expect((await owner.req(`/api/antistrat?${qs}&ids=${encodeURIComponent("bad id!")}`)).status).toBe(400);
+    expect((await owner.req("/api/antistrat?map=de_mirage")).status).toBe(400);
+    expect((await outsider.req(`/api/antistrat?${qs}`)).status).toBe(404);
+    expect((await anon.req(`/api/antistrat?${qs}`)).status).toBe(401);
+    // The AI brief is off unless the server has an API key.
+    if (!auto.ai) expect((await owner.req("/api/antistrat/ai", { method: "POST", json: { name: `Scout ${run}`, map: "de_mirage" } })).status).toBe(503);
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: null, teamBName: null } }, 200);
+  });
+});
