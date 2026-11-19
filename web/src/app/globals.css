@@ -531,3 +531,20 @@ dialog.modal h2 { margin: 0 0 12px; font-size: 17px; }
 .st-D { background: var(--panel); color: var(--text-dim); }
 
 a.chip { text-decoration: none; color: inherit; }
+
+/* ---------- heatmaps & utility ---------- */
+.ins { margin-bottom: 18px; }
+.ins-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ins-head h2 { margin: 0 0 10px; font-size: 16px; }
+.ins-controls { display: flex; gap: 10px 14px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.ins-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.ins-body { display: grid; grid-template-columns: minmax(0, 560px) minmax(260px, 1fr); gap: 16px; align-items: start; }
+.ins-canvas { width: 100%; aspect-ratio: 1; border-radius: var(--radius-sm); border: 1px solid var(--border); display: block; }
+.ins-list ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 520px; overflow-y: auto; }
+.ins-cluster { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; cursor: pointer; text-align: left; font-size: 13px; }
+.ins-cluster:hover { background: var(--panel); }
+li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); background: var(--panel); }
+.ins-rank { width: 18px; color: var(--text-faint); font-size: 12px; }
+.ins-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+.ins-examples { list-style: none; margin: 2px 0 8px 34px; padding: 0; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+@media (max-width: 900px) { .ins-body { grid-template-columns: 1fr; } }

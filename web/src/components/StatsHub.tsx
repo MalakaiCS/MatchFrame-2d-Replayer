@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { mapName } from "@/viewer/maps";
 import { api, ApiError } from "./api";
+import { InsightsPanel } from "./Insights";
 
 interface WL { w: number; p: number }
 interface TeamItem { key: string; name: string; demos: number; wins: number; losses: number; draws: number; maps: string[]; lastPlayed: string }
@@ -212,6 +213,12 @@ export function TeamOverview() {
               </table>
             </div>
           </section>
+
+          {map ? (
+            <InsightsPanel source={{ kind: "team", name: d.name, map, spaceQs: qsKey }} />
+          ) : (
+            <p className="alert" role="status" style={{ marginBottom: 18 }}>Pick a map above to see {d.name}&apos;s heatmaps and grenade lineups on it.</p>
+          )}
 
           <div className="st-two">
             <section className="card" aria-label="Matches">

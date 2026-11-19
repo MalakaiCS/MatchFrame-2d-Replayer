@@ -464,3 +464,21 @@ describe("stats across demos", () => {
   });
 });
 
+describe("heatmaps and utility", () => {
+  it("serves positions and grenades for a replay to people who can open it, round links only their round", async () => {
+    const pos = await owner.json(`/api/insights?replay=${replayId}&team=A&layer=pos`, {}, 200);
+    expect(pos.mapId).toBe("de_mirage");
+    expect(pos.points.length).toBeGreaterThan(0);
+    const early = await owner.json(`/api/insights?replay=${replayId}&team=A&layer=pos&from=0&to=4`, {}, 200);
+    expect(early.points.length).toBeLessThan(pos.points.length);
+    expect((await owner.req(`/api/insights?replay=${replayId}&team=C`)).status).toBe(400);
+    expect((await owner.req(`/api/insights?replay=${replayId}&team=A&layer=nope`)).status).toBe(400);
+    expect((await outsider.req(`/api/insights?replay=${replayId}&team=A`)).status).toBe(404);
+    const { token } = await owner.json(`/api/replays/${replayId}/share`, { method: "POST", json: { roundId: "r02" } }, 201);
+    const one = await new Client("rl", token).json(`/api/insights?replay=${replayId}&team=A&layer=pos`, {}, 200);
+    expect(one.points.length).toBeGreaterThan(0);
+    expect(one.points.length).toBeLessThan(pos.points.length);
+    await owner.json(`/api/replays/${replayId}/share`, { method: "DELETE" }, 200);
+  });
+});
+

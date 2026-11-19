@@ -16,6 +16,7 @@ import {
   type PlayerTotals, type StatsFilter,
 } from "@/viewer/stats";
 import { api, ApiError, setShareToken } from "./api";
+import { InsightsPanel } from "./Insights";
 import { reasonText } from "./viewer/RoundStrip";
 
 interface ReplayResponse {
@@ -140,6 +141,7 @@ export function MatchStats({ id }: { id: string }) {
         ADR counts damage until each round is decided. Rating uses the public HLTV 1.0 formula.{hasDamage ? "" : " This demo has no damage events, so ADR and utility damage are unavailable."}
       </p>
 
+      <InsightsPanel source={{ kind: "replay", replayId: id, teams: { A: T.A.name, B: T.B.name }, shareHash: hash }} />
       <EconomyChart m={m} rounds={shownRounds} href={replayHref} />
       <RoundHistory m={m} rounds={shownRounds} href={replayHref} />
     </div>
