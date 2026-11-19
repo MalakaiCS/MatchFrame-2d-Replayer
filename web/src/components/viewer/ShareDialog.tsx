@@ -17,6 +17,11 @@ interface Props {
   replayTeamId: string | null;
   visibility: string;
   onChanged: () => void;
+  /** Round number shown in the round-link section. */
+  roundNumber: number;
+  /** Owners and coaches can create a public link to the current round. */
+  canManage: boolean;
+  onRoundLink: () => void;
 }
 
 export function ShareDialog(p: Props) {
@@ -119,6 +124,21 @@ export function ShareDialog(p: Props) {
           <button type="button" className="btn" onClick={() => copy(momentUrl, "moment")}><IconLink /> {copied === "moment" ? "Copied" : "Copy"}</button>
         </div>
       </section>
+
+      {p.canManage && !p.viaShare ? (
+        <>
+          <hr style={{ borderColor: "var(--border)", margin: "16px 0" }} />
+          <section className="stack">
+            <strong style={{ fontSize: 13 }}>Link to round {p.roundNumber}</strong>
+            <p className="faint" style={{ margin: 0, fontSize: 12 }}>
+              Anyone with this link can watch round {p.roundNumber} only, without an account. Copying again gives the same link; “Revoke all links” turns it off.
+            </p>
+            <div className="row">
+              <button type="button" className="btn" onClick={p.onRoundLink}><IconLink /> Copy round link</button>
+            </div>
+          </section>
+        </>
+      ) : null}
 
       {p.isOwner ? (
         <>

@@ -194,6 +194,35 @@ describe("read-only links", () => {
     expect((await viewer.req(`/api/replays/${replayId}/rounds/r02`)).status).toBe(404);
   });
 
+  it("round links open one round only, are reusable, and need a manager", async () => {
+    // A teammate with access through a grant cannot create public links.
+    expect((await mate.req(`/api/replays/${replayId}/share`, { method: "POST", json: { roundId: "r03" } })).status).toBe(403);
+    expect((await owner.req(`/api/replays/${replayId}/share`, { method: "POST", json: { roundId: "r99" } })).status).toBe(400);
+    expect((await owner.req(`/api/replays/${replayId}/share`, { method: "POST", json: { roundId: "../x" } })).status).toBe(400);
+    const first = await owner.json(`/api/replays/${replayId}/share`, { method: "POST", json: { roundId: "r03" } }, 201);
+    const again = await owner.json(`/api/replays/${replayId}/share`, { method: "POST", json: { roundId: "r03" } }, 200);
+    expect(again.token).toBe(first.token);
+    expect(again.id).toBe(first.id);
+    const listed = await owner.json(`/api/replays/${replayId}/share`, {}, 200);
+    expect(listed.links.find((l: any) => l.id === first.id).roundId).toBe("r03");
+
+    const viewer = new Client("roundlink", first.token);
+    const m = await viewer.json(`/api/replays/${replayId}`, {}, 200);
+    expect(m.access.via).toBe("share");
+    expect(m.access.roundId).toBe("r03");
+    expect(m.manifest.rounds.map((r: any) => r.id)).toEqual(["r03"]);
+    expect((await viewer.req(`/api/replays/${replayId}/rounds/r03`)).status).toBe(200);
+    expect((await viewer.req(`/api/replays/${replayId}/rounds/r02`)).status).toBe(404);
+    expect((await viewer.json(`/api/replays/${replayId}/review`, {}, 200)).notes).toEqual([]);
+
+    // Revoking all links turns the round link off; asking again issues a new one.
+    await owner.json(`/api/replays/${replayId}/share`, { method: "DELETE" }, 200);
+    expect((await viewer.req(`/api/replays/${replayId}`)).status).toBe(404);
+    const fresh = await owner.json(`/api/replays/${replayId}/share`, { method: "POST", json: { roundId: "r03" } }, 201);
+    expect(fresh.token).not.toBe(first.token);
+    await owner.json(`/api/replays/${replayId}/share`, { method: "DELETE" }, 200);
+  });
+
   it("rejects a forged token", async () => {
     const forged = new Client("forged", "A".repeat(43));
     expect((await forged.req(`/api/replays/${replayId}`)).status).toBe(404);
@@ -374,5 +403,21 @@ describe("team names", () => {
     expect((await mate.req(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: "x" } })).status).toBe(403);
     await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: null } }, 200);
     expect((await owner.json(`/api/replays/${replayId}`)).manifest.teams.A.name).toBe(original);
+  });
+});
+
+describe("website and login gate", () => {
+  it("serves the public site and sends signed-out visitors from the app to /login", async () => {
+    const home = await anon.req("/");
+    expect(home.status).toBe(200);
+    expect(await home.text()).toContain("seen from above");
+    for (const path of ["/replays", "/replays/new", "/teams"]) {
+      const r = await anon.req(path);
+      expect(r.status, path).toBe(307);
+      expect(r.headers.get("location"), path).toContain(`/login?next=${encodeURIComponent(path)}`);
+    }
+    // Replay pages stay reachable so round and read-only links (token in the fragment) can open.
+    expect((await anon.req("/replays/abcdefghijkl")).status).toBe(200);
+    expect((await owner.req("/replays")).status).toBe(200);
   });
 });

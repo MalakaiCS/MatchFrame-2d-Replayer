@@ -143,6 +143,40 @@ test("share link opens the selected moment in a clean session; revocation blocks
   await clean.close();
 });
 
+test("round link opens just that round for a signed-out visitor", async ({ browser }) => {
+  const ctx = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  const page = await ctx.newPage();
+  await signIn(page);
+  await page.goto(`${replayUrl}?r=r04`);
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeEnabled({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Copy link to round 4" }).click();
+  await expect(page.locator(".radar-toast")).toContainText("Link to round 4 copied");
+  const link = await page.evaluate(() => navigator.clipboard.readText());
+  expect(link).toMatch(/\/replays\/[A-Za-z0-9]+\?r=r04#s=/);
+
+  const anon = await (await browser.newContext()).newPage();
+  await anon.goto(link);
+  await expect(anon.getByText("Round link · round 4 only")).toBeVisible({ timeout: 15_000 });
+  await expect(anon.locator(".round-chip")).toHaveCount(1);
+  await expect(anon.getByRole("button", { name: /^Round 4/ })).toHaveAttribute("aria-current", "true");
+  await expect(anon.getByRole("button", { name: /^Filters/ })).toHaveCount(0);
+  await anon.screenshot({ path: path.join(OUT, "round-link.png") });
+
+  // Signed-out visitors without a link are sent to the login screen.
+  await anon.goto(`${BASE}/replays`);
+  await anon.waitForURL(/\/login\?next=%2Freplays/);
+  await anon.goto(replayUrl);
+  await anon.waitForURL(/\/login\?next=/);
+  await ctx.close();
+});
+
+test("public website links to sign-up and sign-in", async ({ page }) => {
+  await page.goto(BASE);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("seen from above");
+  await expect(page.getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/signup");
+  await page.screenshot({ path: path.join(OUT, "website.png"), fullPage: true });
+});
+
 test("narrow screen keeps map and playback visible", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();

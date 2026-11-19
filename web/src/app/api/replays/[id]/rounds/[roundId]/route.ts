@@ -13,6 +13,8 @@ export const GET = route(async (req: Request, ctx: { params: Promise<{ id: strin
   const { id, roundId } = await ctx.params;
   if (!/^r\d{2,3}$/.test(roundId)) throw notFound();
   const a = await replayAccess(req, id);
+  // A round link opens exactly one round.
+  if (a.shareRoundId && a.shareRoundId !== roundId) throw notFound();
   if (a.replay.status !== "ready" || !a.replay.published_prefix) throw notFound();
   const obj = await getStorage().stream(`${a.replay.published_prefix}/rounds/${roundId}.json.gz`);
   if (!obj) throw notFound();

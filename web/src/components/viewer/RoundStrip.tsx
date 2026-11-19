@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Manifest, RoundSummary, TeamKey } from "@/shared/contract";
+import { IconLink } from "../icons";
 import { BUY_LABELS, BUY_OPTIONS, EMPTY_FILTERS, isEmpty, type RoundFilters, type RoundKind } from "@/viewer/filters";
 
 const REASON: Record<string, string> = {
@@ -14,8 +15,12 @@ export function reasonText(r: string | null) {
 }
 
 export function RoundStrip({
-  manifest, visible, current, onSelect, filters, setFilters,
+  manifest, visible, current, onSelect, filters, setFilters, onCopyLink, roundOnly,
 }: {
+  /** Copies a link that opens one round; shown for the current round. */
+  onCopyLink?: (roundId: string) => void;
+  /** Viewing through a round link: no filters, only this round. */
+  roundOnly?: boolean;
   manifest: Manifest;
   visible: RoundSummary[];
   current: string;
@@ -44,10 +49,10 @@ export function RoundStrip({
   return (
     <section className="rounds collapsible" data-open={open} aria-label="Rounds">
       <div className="round-bar">
-        <button type="button" className="btn btn-sm round-filter-btn" aria-expanded={filtersOpen} aria-pressed={filtered}
+        {roundOnly ? null : <button type="button" className="btn btn-sm round-filter-btn" aria-expanded={filtersOpen} aria-pressed={filtered}
           onClick={() => setFiltersOpen((v) => !v)} title="Round filters">
           Filters{filtered ? ` · ${visible.length}/${manifest.rounds.length}` : ""}
-        </button>
+        </button>}
         <button type="button" className="btn btn-ghost icon-btn btn-sm collapse-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? "Hide rounds" : "Show rounds"}
         </button>
@@ -72,6 +77,13 @@ export function RoundStrip({
           })}
         </div>
         <button type="button" className="btn btn-ghost icon-btn btn-sm round-scroll" onClick={() => scroll(1)} aria-label="Scroll rounds right">›</button>
+        {onCopyLink ? (
+          <button type="button" className="btn btn-sm round-link-btn" onClick={() => onCopyLink(current)}
+            aria-label={`Copy link to round ${manifest.rounds.find((r) => r.id === current)?.displayNumber ?? ""}`}
+            title="Copy a link that opens this round. Anyone with the link can watch it, no account needed.">
+            <IconLink width={14} height={14} /> Round link
+          </button>
+        ) : null}
       </div>
       {filtersOpen ? (
         <div className="filters-pop">

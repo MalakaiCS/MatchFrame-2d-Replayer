@@ -50,6 +50,8 @@ export interface Access {
   canManage: boolean;
   canReview: boolean;
   shareLinkId: string | null;
+  /** Set when the share link only opens one round (a "round link"). */
+  shareRoundId?: string | null;
   /** Teams of the viewer (empty for share-link viewers). */
   teams: { team_id: string; role: TeamRole }[];
 }
@@ -60,8 +62,8 @@ export async function userTeams(userId: string) {
 
 export async function shareLinkFor(replayId: string, token: string | null) {
   if (!token || token.length < 20 || token.length > 100) return null;
-  return q1<{ id: string }>(
-    "select id from share_links where replay_id = $1 and token_hash = $2 and revoked_at is null",
+  return q1<{ id: string; round_id: string | null }>(
+    "select id, round_id from share_links where replay_id = $1 and token_hash = $2 and revoked_at is null",
     [replayId, sha256(token)],
   );
 }
@@ -103,7 +105,7 @@ export async function replayAccess(req: Request, replayId: string, opts: { user?
     }
   }
   const link = await shareLinkFor(replayId, shareToken);
-  if (link) return { replay, user, teams: [], via: "share", canManage: false, canReview: false, shareLinkId: link.id };
+  if (link) return { replay, user, teams: [], via: "share", canManage: false, canReview: false, shareLinkId: link.id, shareRoundId: link.round_id };
   // A supplied but invalid/revoked link reads as "not found", not as a sign-in prompt.
   if (!user && !shareToken) throw unauthorized();
   throw notFound();

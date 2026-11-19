@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { replayAccess, VISIBLE_REPLAYS_SQL } from "@/lib/access";
 import { q, tx } from "@/lib/db";
-import { badRequest, body, forbidden, json, route } from "@/lib/http";
+import { badRequest, body, forbidden, json, notFound, route } from "@/lib/http";
 import { loadManifest } from "@/lib/manifest";
 import { accessView, publicReplay } from "@/lib/replay-view";
 
@@ -23,6 +23,8 @@ export const GET = route(async (req: Request, ctx: Ctx) => {
         },
       }
     : base;
+  // A round link only exposes its round.
+  const scoped = manifest && a.shareRoundId ? { ...manifest, rounds: manifest.rounds.filter((x) => x.id === a.shareRoundId) } : manifest;
   let series: unknown[] = [];
   if (r.series_id && a.user) {
     series = await q(
@@ -31,7 +33,8 @@ export const GET = route(async (req: Request, ctx: Ctx) => {
       [a.user.id, r.series_id],
     );
   }
-  return json({ replay: publicReplay(r), access: accessView(a), manifest, series });
+  if (scoped && !scoped.rounds.length) throw notFound();
+  return json({ replay: publicReplay(r), access: { ...accessView(a), roundId: a.shareRoundId ?? null }, manifest: scoped, series });
 });
 
 const Patch = z.object({

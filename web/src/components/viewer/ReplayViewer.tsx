@@ -36,7 +36,7 @@ interface ReplayResponse {
     id: string; title: string | null; status: string; failureCode: string | null; failureDetail: string | null; visibility: string;
     sourceAvailable: boolean; teamId: string | null; seriesId: string | null; seriesMapIndex: number | null; mapId: string | null;
   };
-  access: { via: string; canManage: boolean; canReview: boolean; signedIn: boolean };
+  access: { via: string; canManage: boolean; canReview: boolean; signedIn: boolean; roundId?: string | null };
   manifest: Manifest | null;
   series: { id: string; mapIndex: number | null; mapId: string | null; status: string; scoreA: number | null; scoreB: number | null }[];
 }
@@ -82,7 +82,13 @@ export function ReplayViewer({ id }: { id: string }) {
     return () => clearInterval(t);
   }, [data, load]);
 
+  // Signed out and no valid link: go to the login screen and come back here afterwards.
+  useEffect(() => {
+    if (loadError?.status === 401) router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+  }, [loadError, router]);
+
   if (loadError) {
+    if (loadError.status === 401) return <div className="page"><p className="muted">Redirecting to sign in…</p></div>;
     return (
       <div className="page" style={{ maxWidth: 640 }}>
         <h1>{loadError.status === 401 ? "Sign in to view this replay" : "Replay unavailable"}</h1>
@@ -534,6 +540,43 @@ function Workspace({
   const roundBookmarks = review.bookmarks.filter((b) => b.roundId === round.id && b.status !== "unavailable").map((b) => ({ id: b.id, tick: b.tick, title: b.title ?? "" }));
   const reviewTeams = teams;
   const playlistNav = usePlaylistNav(params, id, goRound);
+  const roundOnly = viaShare && !!data.access.roundId;
+
+  /**
+   * Copy a link to one round. Owners and coaches get a round link anyone can open; other members
+   * get a plain link that works for people who already have access to the replay.
+   */
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const copyRoundLink = useCallback(async (rid: string) => {
+    const n = manifest.rounds.find((r) => r.id === rid)?.displayNumber;
+    const origin = window.location.origin;
+    let url = buildReplayUrl(origin, id, rid);
+    let who = "people who can already open this replay";
+    try {
+      if (viaShare && shareToken && (!data.access.roundId || data.access.roundId === rid)) {
+        url = buildReplayUrl(origin, id, rid, undefined, shareToken);
+        who = "anyone with the link";
+      } else if (data.access.canManage && !viaShare) {
+        const r = await api<{ token: string }>(`/api/replays/${id}/share`, { method: "POST", json: { roundId: rid } });
+        url = buildReplayUrl(origin, id, rid, undefined, r.token);
+        who = "anyone with the link, no account needed";
+      }
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "Could not create the round link.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setToast(`Link to round ${n} copied. It opens for ${who}.`);
+    } catch {
+      window.prompt(`Link to round ${n}`, url);
+    }
+  }, [manifest.rounds, id, viaShare, shareToken, data.access.roundId, data.access.canManage]);
 
   const dockTabs: { id: DockTab; label: string; show: boolean }[] = [
     { id: "events", label: "Events", show: true },
@@ -578,7 +621,7 @@ function Workspace({
         <span className="grow" />
         {manifest.sourceType === "pov" ? <span className="badge badge-warn" title="Point-of-view recording">POV · partial coverage</span> : null}
         {manifest.parser.synthetic ? <span className="badge badge-warn">Synthetic fixture</span> : null}
-        {viaShare ? <span className="badge">Read-only link</span> : null}
+        {viaShare ? <span className="badge">{roundOnly ? `Round link · round ${round.displayNumber} only` : "Read-only link"}</span> : null}
         <span className="faint" style={{ fontSize: 12 }}>Final {manifest.finalScore.A}–{manifest.finalScore.B}</span>
         <button type="button" className="btn btn-sm" aria-pressed={reviewOpen} aria-expanded={reviewOpen} aria-controls="review-drawer"
           onClick={() => setReviewOpen((v) => !v)}>Review{review.notes.length + review.bookmarks.length ? ` (${review.notes.length + review.bookmarks.length})` : ""}</button>
@@ -639,10 +682,12 @@ function Workspace({
             {index && !radarImgs.current.get(0) ? (
               <div className="radar-note">Radar image not installed: positions drawn on a {manifest.map.calibration === "calibrated-unverified" ? "calibrated (unverified)" : "provisional"} 512-unit grid.</div>
             ) : null}
+            {toast ? <div className="radar-toast" role="status">{toast}</div> : null}
             {notice ? <div className="radar-note" role="status">{notice} <button className="btn btn-ghost btn-sm" onClick={() => setNotice(null)}>Dismiss</button></div> : null}
           </div>
 
-          <RoundStrip manifest={manifest} visible={visibleRounds} current={round.id} onSelect={(rid) => goRound(rid)} filters={filters} setFilters={setFilters} />
+          <RoundStrip manifest={manifest} visible={visibleRounds} current={round.id} onSelect={(rid) => goRound(rid)} filters={filters} setFilters={setFilters}
+            onCopyLink={copyRoundLink} roundOnly={roundOnly} />
 
           <div className="transport">
             <div className="transport-row" role="toolbar" aria-label="Playback controls">
@@ -715,7 +760,8 @@ function Workspace({
       </div>
 
       <ShareDialog open={shareOpen} onClose={() => { setShareOpen(false); reload(); }} replayId={id} roundId={round.id} roundMs={roundMs}
-        isOwner={data.access.via === "owner"} viaShare={viaShare} teams={teams} replayTeamId={data.replay.teamId} visibility={data.replay.visibility} onChanged={reload} />
+        isOwner={data.access.via === "owner"} viaShare={viaShare} teams={teams} replayTeamId={data.replay.teamId} visibility={data.replay.visibility} onChanged={reload}
+        roundNumber={round.displayNumber} canManage={data.access.canManage} onRoundLink={() => copyRoundLink(round.id)} />
       <ShortcutsDialog open={kbdOpen} onClose={() => setKbdOpen(false)} />
     </div>
   );

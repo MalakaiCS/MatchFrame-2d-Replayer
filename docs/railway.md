@@ -69,3 +69,11 @@
 - **Crashes and restarts**: an expired lease is reclaimed by another worker. A job that keeps crashing stops after `max_attempts` (5) with `WORKER_CRASH`.
 - **Maintenance** runs inside the worker every `MAINTENANCE_EVERY_S` under an advisory lock. It expires stale upload slots, removes expired sources, and deletes abandoned revision prefixes.
 - **Backups**: enable Railway Postgres backups. Bucket contents can be rebuilt only while sources are kept, so treat the bucket as primary data for published replays.
+
+
+## Round links and AUTH_SECRET
+
+Round links (one round, viewable without an account) use a token derived from the link id and
+`AUTH_SECRET`. Keep `AUTH_SECRET` stable: rotating it signs everyone out and turns existing round
+links off (new ones can be copied straight away). Run the migrations on deploy as usual; the
+web service's start command already applies `004_round_share_links.sql`.
