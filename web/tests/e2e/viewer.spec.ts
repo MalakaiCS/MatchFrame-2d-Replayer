@@ -264,3 +264,22 @@ test("narrow screen keeps map and playback visible", async ({ browser }) => {
   await page.screenshot({ path: path.join(OUT, "viewer-mobile.png"), fullPage: false });
   await ctx.close();
 });
+
+test("several rounds play together on one map; a round can be highlighted and opened", async ({ page }) => {
+  await signIn(page);
+  const id = new URL(replayUrl).pathname.split("/").pop()!;
+  await page.goto(`${BASE}/replays/multi?rounds=${id}~r02,${id}~r03,${id}~r04`);
+  const list = page.getByRole("heading", { name: "Rounds (3)" });
+  await expect(list).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.waitForTimeout(1200);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(page.locator(".mr-transport, .cmp-transport").locator(".mono")).not.toHaveText("0:00");
+  // Highlight one round, then open it at the current time.
+  await page.locator(".mr-round").nth(1).click();
+  const open = page.getByRole("link", { name: /Open this round at/ });
+  await expect(open).toHaveAttribute("href", new RegExp(`/replays/${id}\\?r=r03&t=\\d+`));
+  // Hide a round.
+  await page.getByRole("checkbox", { name: /Show R/ }).first().uncheck();
+  await expect(page.getByRole("checkbox", { name: /Show R/ }).first()).not.toBeChecked();
+});

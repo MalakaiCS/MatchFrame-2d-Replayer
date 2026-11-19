@@ -249,6 +249,15 @@ function Report({ data, name, map, ids, space, teamId }: { data: Resp; name: str
         <div className="card as-kpi"><strong>{R.rounds.CT}</strong><span className="faint">CT rounds</span></div>
         <div className="card as-kpi"><strong>{R.patterns.length}</strong><span className="faint">patterns · {R.patterns.filter((p) => p.confidence === "strong").length} strong</span></div>
       </div>
+      <div className="as-play" role="group" aria-label="Play rounds together">
+        <span className="faint">Watch their rounds together:</span>
+        {(["T", "CT"] as const).map((sd) => (
+          <Link key={sd} className="btn btn-sm" href={`/replays/multi?${new URLSearchParams({ team: name, map, side: sd, buy: "full_buy", n: "5", ...(space !== "all" ? { space } : {}), ...(teamId ? { teamId } : {}) })}`}>
+            ▶ Last 5 full-buy {sd} rounds
+          </Link>
+        ))}
+        <Link className="btn btn-sm" href={`/replays/multi?${new URLSearchParams({ team: name, map, side: "T", buy: "pistol", n: "5", ...(space !== "all" ? { space } : {}), ...(teamId ? { teamId } : {}) })}`}>▶ Pistol rounds</Link>
+      </div>
       <DefaultsView d={data.defaults} />
       {data.ai ? <AiBrief name={name} map={map} ids={ids} space={space} teamId={teamId} disabled={!!data.pending || !R.patterns.length} /> : null}
       <div className="ins-controls" style={{ margin: "12px 0" }}>
@@ -286,6 +295,9 @@ function Report({ data, name, map, ids, space, teamId }: { data: Resp; name: str
               <p className="as-counter"><strong>Counter:</strong> {p.counter}</p>
               {p.examples.length ? (
                 <p className="as-ex">
+                  {p.examples.length >= 2 ? (
+                    <Link className="chip as-playall" href={`/replays/multi?${new URLSearchParams({ rounds: [...new Set(p.examples.map((e) => `${e.replayId}~${e.roundId}`))].slice(0, 10).join(","), team: name })}`} title="Play these rounds together on one map">▶ Together</Link>
+                  ) : null}
                   <span className="faint">Rounds:</span>{" "}
                   {p.examples.map((e) => (
                     <Link key={`${e.replayId}:${e.roundId}`} className="chip" href={`/replays/${e.replayId}?r=${e.roundId}&t=${e.ms}`} title="Watch this round">
