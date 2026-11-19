@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/access";
 import { assertCanUploadTo } from "@/lib/billing";
+import { jobPriority } from "@/lib/priority";
 import { tx } from "@/lib/db";
 import { env } from "@/lib/env";
 import { badRequest, body, conflict, json, notFound, route } from "@/lib/http";
@@ -28,6 +29,7 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
   const opts = await body(req, Req);
   // Checked before the transaction so a missing plan leaves the upload slot usable after subscribing.
   await assertCanUploadTo(user.id, opts.teamId ?? null);
+  const priority = await jobPriority(user.id);
   const storage = getStorage();
 
   return tx(async (c) => {
@@ -70,7 +72,7 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
       [replayId, user.id, teamId, opts.title || null, teamId ? "team" : "private", up.object_key, size, up.filename,
         env.pendingSourceTtlSeconds, opts.seriesId ?? null, opts.seriesMapIndex ?? null],
     );
-    await c.query("insert into jobs(replay_id, revision, kind) values ($1, 1, 'parse') on conflict do nothing", [replayId]);
+    await c.query("insert into jobs(replay_id, revision, kind, priority) values ($1, 1, 'parse', $2) on conflict do nothing", [replayId, priority]);
     await c.query("update uploads set status = 'completed', replay_id = $2, completed_at = now() where id = $1", [id, replayId]);
     return json({ replayId, status: "queued", duplicate: false }, { status: 201 });
   });

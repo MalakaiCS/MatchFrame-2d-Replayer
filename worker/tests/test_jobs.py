@@ -224,3 +224,14 @@ def test_maintenance_expires_uploads_and_abandoned_prefixes(env):
     assert not storage.exists("uploads/u/stale.dem")
     assert not storage.exists(f"replays/{rid}/r1/a9/manifest.json.gz")
     assert storage.exists(f"{replay(conn, rid)['published_prefix']}/manifest.json.gz")
+
+
+def test_priority_jobs_are_claimed_first(env):
+    cfg, conn, storage, uid = env
+    normal, _ = make_replay(conn, storage, uid, encode({"map": "de_mirage", "winners": "AB"}))
+    paid, _ = make_replay(conn, storage, uid, encode({"map": "de_mirage", "winners": "BA"}))
+    conn.execute("update jobs set priority = 1 where replay_id = %s", (paid,))
+    first = jobs.claim(conn, "w-a", 60)
+    assert first["replay_id"] == paid
+    second = jobs.claim(conn, "w-b", 60)
+    assert second["replay_id"] == normal

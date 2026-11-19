@@ -559,3 +559,10 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
 .move-err { color: var(--danger); font-size: 11px; }
 @media (max-width: 900px) { .replay-row { grid-template-columns: 1fr; } .move-ctl { align-items: flex-start; } }
 .move-ctl select { width: 170px; }
+
+/* bulk upload queue */
+.bulk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bulk-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); font-size: 13px; }
+.bulk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bulk-progress { width: 140px; height: 6px; display: inline-block; }
+.bulk-msg { flex-basis: 100%; color: var(--danger); font-size: 12px; }

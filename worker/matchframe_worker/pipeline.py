@@ -199,7 +199,8 @@ def _fan_out_series(cfg: Config, conn, storage: Storage, rep: dict, job: dict, k
                 (cid, rep["owner_id"], rep["team_id"], f"{base_title} · map {i}", rep["visibility"], key, size,
                  name.rsplit("/", 1)[-1], series_id, i),
             )
-            conn.execute("insert into jobs(replay_id, revision, kind) values (%s, 1, 'parse') on conflict do nothing", (cid,))
+            conn.execute("insert into jobs(replay_id, revision, kind, priority) values (%s, 1, 'parse', %s) on conflict do nothing",
+                         (cid, job.get("priority", 0)))
         log.info("series %s: queued map %d (%s) as %s", series_id, i, name, cid)
     conn.execute(
         "update replays set series_id = coalesce(series_id, %s), series_map_index = coalesce(series_map_index, 1), "

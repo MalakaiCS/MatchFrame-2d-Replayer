@@ -24,7 +24,7 @@ where j.id = (
   where kind = any(%(kinds)s::job_kind[])
     and ((status = 'queued' and next_run_at <= now())
       or (status = 'running' and lease_expires_at < now()))
-  order by next_run_at, id
+  order by priority desc, next_run_at, id
   for update skip locked
   limit 1
 )

@@ -187,6 +187,17 @@ test("public website links to sign-up and sign-in", async ({ page }) => {
   await page.screenshot({ path: path.join(OUT, "website.png"), fullPage: true });
 });
 
+test("bulk upload queues several demos and processes each", async ({ page }) => {
+  await signIn(page);
+  const f2 = path.join(OUT, "synthetic-dust2.dem");
+  writeFileSync(f2, Buffer.concat([Buffer.from("MFSYNTH1"), Buffer.from(JSON.stringify({ map: "de_dust2", winners: "AB" }))]));
+  await page.goto(`${BASE}/replays/new`);
+  await page.getByTestId("file-input").setInputFiles([fixture, f2]);
+  await expect(page.getByText("2 demos → your personal demos")).toBeVisible();
+  await page.getByRole("button", { name: "Upload all" }).click();
+  await expect(page.locator('.bulk-item[data-state="ready"]')).toHaveCount(2, { timeout: 90_000 });
+});
+
 test("narrow screen keeps map and playback visible", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
