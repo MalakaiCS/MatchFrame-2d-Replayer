@@ -123,11 +123,18 @@ def load(path: str, *, sample_every: int) -> RawDemo:
     # Ammo (clip / reserve) comes from demoparser2 at the same sample ticks; optional.
     from .ammo import load_ammo
 
-    ammo = load_ammo(path, sorted(samples["tick"].unique().to_list())) if samples.height else None
+    sample_ticks = sorted(samples["tick"].unique().to_list()) if samples.height else []
+    ammo = load_ammo(path, sample_ticks) if sample_ticks else None
     if ammo is not None and ammo.height:
         samples = samples.join(ammo, on=["tick", "steamid"], how="left")
     else:
         warnings.append("Ammo counts are unavailable for this demo.")
+    if os.environ.get("WORKER_RECORDED_RESERVE") == "1" and sample_ticks:
+        from .ammo import load_recorded_reserve
+
+        reserve = load_recorded_reserve(path, sample_ticks)
+        if reserve is not None and reserve.height:
+            samples = samples.join(reserve, on=["tick", "steamid"], how="left")
     if "inventory" in samples.columns and samples.schema["inventory"] == pl.Utf8:
         samples = samples.with_columns(
             pl.when(pl.col("inventory").is_null() | (pl.col("inventory") == ""))

@@ -22,51 +22,6 @@ log = logging.getLogger(__name__)
 NO_AMMO = ("knife", "bayonet", "karambit", "dagger", "grenade", "flashbang", "molotov", "incendiary", "decoy", "c4", "bomb")
 
 
-# Standard reserve ammo per weapon (CS2). Used to ESTIMATE reserve: GOTV demos record the
-# clip exactly but the networked reserve field is coarse/unreliable (checked on real demos,
-# docs/data-contract.md#ammo). Weapons not listed get no reserve estimate.
-MAX_RESERVE = {
-    "ak47": 90, "m4a1": 90, "m4a1_silencer": 80, "famas": 90, "galilar": 90, "aug": 90, "sg556": 90,
-    "awp": 30, "ssg08": 90, "scar20": 90, "g3sg1": 90,
-    "mac10": 100, "mp9": 120, "mp7": 120, "mp5sd": 120, "ump45": 100, "p90": 100, "bizon": 120,
-    "nova": 32, "xm1014": 32, "mag7": 32, "sawedoff": 32, "negev": 300, "m249": 200,
-    "glock": 120, "usp_silencer": 24, "hkp2000": 52, "p250": 26, "deagle": 35, "fiveseven": 100,
-    "tec9": 90, "cz75a": 12, "elite": 120, "revolver": 8,
-}
-
-
-def max_reserve(weapon: str | None) -> int | None:
-    if not weapon:
-        return None
-    return MAX_RESERVE.get(weapon.lower().replace("weapon_", ""))
-
-
-def estimate_reserve(weapons: list[str | None], clips: list[int]) -> list[int]:
-    """Per-sample reserve estimate for one player's track within one round.
-
-    Starts each weapon at its standard reserve (CS2 refills ammo at round start) and
-    subtracts the rounds loaded by each reload (clip increase on the same weapon).
-    Returns -1 where no estimate applies.
-    """
-    left: dict[str, int] = {}
-    out: list[int] = []
-    prev_w: str | None = None
-    prev_c = -1
-    for w, c in zip(weapons, clips):
-        mx = max_reserve(w)
-        if mx is None or c < 0:
-            out.append(-1)
-            prev_w, prev_c = w, c
-            continue
-        r = left.setdefault(w, mx)
-        if w == prev_w and prev_c >= 0 and c > prev_c:
-            r = max(0, r - (c - prev_c))
-            left[w] = r
-        out.append(r)
-        prev_w, prev_c = w, c
-    return out
-
-
 def has_ammo(weapon: str | None) -> bool:
     if not weapon:
         return False
@@ -93,3 +48,39 @@ def load_ammo(path: str, ticks: list[int]) -> pl.DataFrame | None:
         pl.col("steamid").cast(pl.UInt64, strict=False).cast(pl.Utf8).alias("steamid"),
         pl.col("active_weapon_ammo").cast(pl.Int64, strict=False).alias("clip"),
     ).unique(subset=["tick", "steamid"], keep="first")
+
+
+def load_recorded_reserve(path: str, sample_ticks: list[int]) -> pl.DataFrame | None:
+    """Recorded reserve of each player's active weapon: weapon entity `m_pReserveAmmo[0]`.
+
+    This is the value the reference viewer shows (verified 2026-11-19 on a shared demo:
+    35/4, 13/3, 4/2 ...). demoparser2 decodes this field incorrectly, so it is read from
+    Awpy's all-entity table, which is memory-heavy (about 6.6 GiB for a 361 MB demo).
+    Enabled only with WORKER_RECORDED_RESERVE=1 on a worker sized for it.
+    """
+    try:
+        from awpy import Demo
+
+        d = Demo(path)
+        wanted = pl.Series("tick", sample_ticks, dtype=pl.Int64)
+        w = (
+            d.ticks(["m_pReserveAmmo.0000"], players_only=False)
+            .drop_nulls("m_pReserveAmmo.0000")
+            .filter(pl.col("tick").is_in(wanted))
+            .select(pl.col("tick").cast(pl.Int64), pl.col("entity_id").cast(pl.Int64), pl.col("entity_serial").cast(pl.Int64),
+                    pl.col("m_pReserveAmmo.0000").cast(pl.Int64).alias("reserve"))
+        )
+        p = (
+            d.ticks(["m_pWeaponServices.m_hActiveWeapon"], players_only=True)
+            .filter(pl.col("tick").is_in(wanted))
+            .select(
+                pl.col("tick").cast(pl.Int64),
+                pl.col("steamid").cast(pl.Utf8),
+                (pl.col("m_pWeaponServices.m_hActiveWeapon") % 16384).cast(pl.Int64).alias("entity_id"),
+                (pl.col("m_pWeaponServices.m_hActiveWeapon") // 16384).cast(pl.Int64).alias("entity_serial"),
+            )
+        )
+        return p.join(w, on=["tick", "entity_id", "entity_serial"], how="inner").select(["tick", "steamid", "reserve"])
+    except Exception as e:  # noqa: BLE001 - optional enrichment
+        log.warning("recorded reserve extraction failed: %s", e)
+        return None

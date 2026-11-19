@@ -253,13 +253,43 @@ Next to a player row, a popover shows the in-game console command **"setpos 1594
 
 Pattern Finder, Playbook & Match Prep and Veto simulation are separate products, out of scope. The brief targets **Tier 1 (Full access)**; the differences between the tiers are unknown.
 
+### OBS-SHOT-07: same-demo comparison, EDGE vs Matchframe (owner screenshot, 2026-11-19)
+
+Demo: owner's matchmaking Mirage demo (`mm1.dem`), round 3. EDGE's clock shows **1:25**, which Matchframe's countdown reads at freeze end + 30.2–31.2 s (tick 15576).
+
+| Item | EDGE | Matchframe | Result |
+| --- | --- | --- | --- |
+| Score before round 3 | Team Alpha 1, Team Bravo 1 | 1 : 1 | **match** |
+| Team names (no clan tags) | "Team Alpha" / "Team Bravo" | was "Team A"/"Team B" → **changed to "Team Alpha"/"Team Bravo"** | match after fix |
+| Sides | Team Alpha CT | Team A(lpha) CT | **match** |
+| Health, 10 players | spood 100, deqny 0, Kronk 0, OilyMexican 80, Mala 100; Lasty 0, Melon 0, sun 63, illu 100, ted3 100 | identical | **match** |
+| Money, 10 players | 1900, 2850, 600, 3850, 2950; 150, 450, 400, 100, 0 | identical | **match** |
+| Magazine, 6 alive players | 35, 13, 35; 13, 4, 6 | identical | **match** |
+| Reserve, 6 alive players | 4, 3, 4; 2, 2, 3 (weapon entity `m_pReserveAmmo[0]`) | identical with `WORKER_RECORDED_RESERVE=1`; previously an estimate (90/80/…) that **did not match**, now removed | match (opt-in) |
+| Kill feed | Melon→deqny; Kronk • deqny→Melon (assist shown); OilyMexican→-Lasty (headshot); sun→Kronk | same 4 kills, order and headshot; **assist added** to the feed | match after fix |
+| Dropped bomb | C4 on the ground, upper right (A side) | C4 drawn at the same place | match (visual) |
+| Bomb timeline segment | red "Bomb" span with plant icon and defuse icon | red "Bomb" span | match (visual) |
+
+Additional reference behaviours seen (open):
+
+- **Timeline**:
+  - small triangles along the bottom edge, coloured by side (probably kills);
+  - dashed light vertical lines (probably a time grid);
+  - solid coloured lines (meaning unknown).
+- **Round strip**: an orange clock-like icon under round 13 (possibly a tactical timeout or halftime marker).
+- **Radar**:
+  - a thin red line from a player (possibly a shot tracer or line of sight);
+  - smokes drawn as textured clouds;
+  - dead players as small dark dots rather than ×.
+- **Scoreboard**: dead players are greyed out, right-aligned, and show 0 HP and money only.
+
 ## Features found in the reference but missing from the brief
 
 | ID | Feature | Source | Evidence | Impl. | Open question |
 | --- | --- | --- | --- | --- | --- |
 | NEW-01 | Automatic match import via Steam (sharecode + game authentication code) | OBS-SHOT-01 banner | needs reference access | not started | Is this part of the 2D Replayer workflow or a platform feature? It needs Valve match-history API access and demo download from Valve replay servers |
 | NEW-02 | Separate own vs opponent buy-type filters | OBS-SHOT-01 filter bar ("All buys", "OPP All buys") | needs reference access | partial: the round filters already pick the team for the buy filter (`buyTeam`) but cannot set both teams independently | Does the 2D Replayer's round list expose own and opponent buy filters? What buy categories does it list? |
-| NEW-04 | Ammo (clip / reserve) per player | OBS-SHOT-03 | verified (visible) | **done**: the clip is recorded (demoparser2 `active_weapon_ammo`, exact on real demos). The reserve is **estimated** (standard reserve minus reloads) because GOTV networks reserve only coarsely. Shown as `30/90` next to the weapon, with the reserve dimmed | Read the active weapon's `m_iClip1` and reserve through `demo.ticks(players_only=False)` on weapon entities, joined to the active-weapon handle. Needs a real demo to build and verify |
+| NEW-04 | Ammo (clip / reserve) per player | OBS-SHOT-03, **OBS-SHOT-07 (same demo)** | verified | **done**: magazine via demoparser2, matching EDGE on all players. Reserve = weapon entity `m_pReserveAmmo[0]`, matching EDGE exactly, behind `WORKER_RECORDED_RESERVE=1` because Awpy's entity scan needs about 6.6–10 GiB per demo. demoparser2 mis-decodes this field. Default: magazine only | Read the active weapon's `m_iClip1` and reserve through `demo.ticks(players_only=False)` on weapon entities, joined to the active-weapon handle. Needs a real demo to build and verify |
 | NEW-07 | Multi-map archives (BO3 downloads) | owner's demos (2026-11-19) | Matchframe product choice | done: one replay per map, linked as a series with a map selector. Tested on 2 real BO3 `.rar` files | Does the reference import a series from one archive? |
 | NEW-08 | Partial and truncated recordings | owner's demos (2026-11-19) | Matchframe product choice | done: real round numbers and scoreboard-seeded score for a recording starting at round 7; truncated tail ignored with a warning | How does the reference show a recording that starts mid-match? |
 | NEW-05 | Multi-round mode | OBS-SHOT-03 (greyed toggle) | needs reference access (higher tier) | not started | What does it do: overlay several rounds, or play rounds back to back? Which tier? |

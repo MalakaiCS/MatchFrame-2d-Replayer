@@ -38,6 +38,7 @@ export interface TeamIdentity {
   key: TeamKey;
   name: string;
   /** Where the name came from: the in-game clan tag, or a generated fallback label. */
+  /** clan = in-game team name; fallback = "Team Alpha"/"Team Bravo" (as the reference names unnamed teams); edited = renamed by a user. */
   nameSource: "clan" | "fallback" | "edited";
   startSide: Side;
 }
@@ -50,8 +51,8 @@ export interface Capabilities {
   money: boolean;
   /** Clip / reserve ammo for the active weapon. Absent on replays processed before ammo support. */
   ammo?: boolean;
-  /** "estimated": reserve derived from the standard reserve and reloads (GOTV does not record it reliably). */
-  reserveAmmo?: "estimated" | "recorded" | "none";
+  /** "recorded": reserve read from the weapon entity; "none": not extracted (magazine only). */
+  reserveAmmo?: "recorded" | "none" | "estimated";
   inventory: boolean;
   economy: boolean;
   bombPosition: boolean;
@@ -144,7 +145,8 @@ export interface PlayerTrack {
   weapon: number[] | null;
   /**
    * Active-weapon ammo; -1 when not applicable (melee, grenades, bomb) or unknown. Absent on older replays.
-   * `clip` is recorded. `reserve` is ESTIMATED (standard reserve minus reloads; see capabilities.reserveAmmo).
+   * `clip` is recorded. `reserve` is the weapon entity's recorded m_pReserveAmmo[0] (the value the reference shows),
+   * present only when the worker runs with WORKER_RECORDED_RESERVE=1.
    */
   clip?: number[] | null;
   reserve?: number[] | null;

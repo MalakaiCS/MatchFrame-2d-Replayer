@@ -26,7 +26,7 @@ Versions recorded per replay: schema version, parser name and version, worker ve
 - On a tie, or when no known player is present, the expected-swap rule applies: halftime after `maxRounds/2`, and every `otMaxRounds/2` rounds in overtime, with no swap at the regulation→OT boundary. A warning is recorded. **This fallback is unverified against real demos.**
 - New players are assigned at their first appearance by their side relative to team A.
 - Player IDs: `s:<steamid64>` for humans. Bots and IDs that cannot be resolved use `b:<name>`. A reconnecting human keeps the same ID.
-- Team names come from the majority clan tag (`team_clan_name`), otherwise `Team A` / `Team B`. The source is recorded in `nameSource`.
+- Team names come from the majority clan tag (`team_clan_name`), otherwise `Team Alpha` / `Team Bravo` (as the reference names them). The source is recorded in `nameSource`.
 
 ## Round metadata
 
@@ -53,11 +53,11 @@ Versions recorded per replay: schema version, parser name and version, worker ve
 ## Ammo
 
 - **Clip** (`track.clip`): recorded. It is read with demoparser2 (`active_weapon_ammo`, pinned 0.42.2) at the same sample ticks, because Awpy 3.3.0 snapshots have no ammo fields. On real demos it counts down shot by shot and refills on reload.
-- **Reserve** (`track.reserve`): **estimated**, and `capabilities.reserveAmmo = "estimated"`. GOTV demos network `Weapon.m_pReserveAmmo` in a coarse form (values 0–4 that do not track bullets, checked on real demos 2026-11-19).
-  - The estimate starts each weapon at its standard CS2 reserve (`worker/matchframe_worker/ammo.py`, `MAX_RESERVE`), since CS2 refills ammo at round start. It then subtracts the rounds loaded by each reload.
-  - Picking up another player's partly used weapon is not detected, so the estimate can then be too high.
-  - The `MAX_RESERVE` table follows current CS2 values and should be re-checked after weapon balance patches.
-- `-1` means not applicable (melee, grenades, bomb) or unknown. The viewer shows `clip/reserve` next to the active weapon, with the reserve dimmed and described as estimated.
+- **Reserve** (`track.reserve`): the active weapon entity's recorded `m_pReserveAmmo[0]` (a small number, e.g. 4, 3, 2). This is exactly what the reference viewer displays, verified on a shared demo (OBS-SHOT-07).
+  - It is read from Awpy's all-entity table joined on the player's active-weapon handle. That needs about 6.6 GiB for a 361 MB demo, so it is opt-in: `WORKER_RECORDED_RESERVE=1`, with `capabilities.reserveAmmo = "recorded"`.
+  - When disabled, only the magazine is shown (`reserveAmmo = "none"`).
+  - demoparser2's `m_pReserveAmmo` / `total_ammo_left` values are wrong for some weapons and are not used.
+- `-1` means not applicable (melee, grenades, bomb) or unknown. The viewer shows `clip/reserve` (or just `clip`) next to the active weapon.
 
 ## Partial and damaged recordings
 

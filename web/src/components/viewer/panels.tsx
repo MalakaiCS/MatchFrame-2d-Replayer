@@ -71,8 +71,8 @@ export function PlayersPanel({
                     <span className="player-sub">
                       <span className="inv-icons"><WeaponIcon name={f?.weapon} height={16} label={`holding ${short(f?.weapon)}`} /></span>
                       {f?.clip != null ? (
-                        <span className="mono ammo" title={f.reserve != null ? "Magazine / reserve (reserve estimated from reloads)" : "Magazine"}
-                          aria-label={`${f.clip} in magazine${f.reserve != null ? `, about ${f.reserve} in reserve` : ""}`}>
+                        <span className="mono ammo" title={f.reserve != null ? "Magazine / reserve" : "Magazine"}
+                          aria-label={`${f.clip} in magazine${f.reserve != null ? `, ${f.reserve} in reserve` : ""}`}>
                           <span>{f.clip}</span>
                           {f.reserve != null ? <span className="faint">/{f.reserve}</span> : null}
                         </span>
@@ -134,8 +134,9 @@ const EVENT_TYPES = new Set(["kill", "bomb_plant", "bomb_defuse", "bomb_explode"
 export function describeEvent(e: GameEvent, name: (id?: string | null) => string): string {
   switch (e.type) {
     case "kill": {
+      const assist = e.assister ? ` with ${name(e.assister)} assisting` : "";
       const tags = [e.headshot && "headshot", e.wallbang && "wallbang", e.throughSmoke && "through smoke", e.noscope && "no-scope", e.attackerBlind && "blind"].filter(Boolean);
-      return `${name(e.actor)} killed ${name(e.target)} · ${short(e.weapon)}${tags.length ? ` (${tags.join(", ")})` : ""}`;
+      return `${name(e.actor)} killed ${name(e.target)}${assist} · ${short(e.weapon)}${tags.length ? ` (${tags.join(", ")})` : ""}`;
     }
     case "bomb_plant": return `${name(e.actor)} planted the bomb${e.site ? ` at ${e.site}` : ""}`;
     case "bomb_defuse": return `${name(e.actor)} defused the bomb`;
@@ -182,6 +183,7 @@ export function EventsPanel({
           {e.type === "kill" ? (
             <span className="kill-line">
               <span className={`side side-${players.get(e.actor ?? "")?.side ?? "CT"}`}>{name(e.actor)}</span>
+              {e.assister ? <span className={`assist side-text-${players.get(e.assister)?.side ?? "CT"}`}>+ {name(e.assister)}</span> : null}
               <WeaponIcon name={e.weapon} height={14} />
               <KillModifiers e={e} />
               <span className={`side side-${players.get(e.target ?? "")?.side ?? "T"}`}>{name(e.target)}</span>

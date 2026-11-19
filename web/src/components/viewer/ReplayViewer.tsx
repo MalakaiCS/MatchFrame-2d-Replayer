@@ -727,6 +727,7 @@ function KillFeed({ events, tick, windowTicks, players }: {
       {recent.map((e) => (
         <div key={e.id} className="killfeed-row" data-fresh={tick - e.tick < windowTicks / 3}>
           {e.actor ? <span className={`side side-${sd(e.actor)}`}>{nm(e.actor)}</span> : null}
+          {e.assister ? <span className={`assist side-text-${sd(e.assister)}`}>+ {nm(e.assister)}</span> : null}
           <WeaponIcon name={e.weapon} height={15} />
           <KillModifiers e={e} height={14} />
           <span className={`side side-${sd(e.target)}`}>{nm(e.target)}</span>

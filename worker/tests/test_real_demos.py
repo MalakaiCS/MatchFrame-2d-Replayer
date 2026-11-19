@@ -27,7 +27,7 @@ EXPECTED = {
     "sashi-vs-mouz-nxt-nuke.dem": ("de_nuke", "Sashi Esport", "MOUZ NXT", 13, 9, 22, {"H1": [6, 6], "H2": [7, 3]}),
     "saw-vs-astral-m1-cache.dem": ("de_cache", "SAW", "ASTRAL", 13, 7, 20, {"H1": [10, 2], "H2": [3, 5]}),
     "saw-vs-bayankhongor-anubis.dem": ("de_anubis", "SAW", "Bayankhongor", 13, 1, 14, {"H1": [11, 1], "H2": [2, 0]}),
-    "mm1.dem": ("de_mirage", "Team A", "Team B", 18, 6, 24, {"H1": [9, 3], "H2": [9, 3]}),
+    "mm1.dem": ("de_mirage", "Team Alpha", "Team Bravo", 18, 6, 24, {"H1": [9, 3], "H2": [9, 3]}),
     # BO3 archives (2026-11-19): overtime, partial recording (starts at round 7), truncated recording.
     "furia-vs-falcons-m1-ancient.dem": ("de_ancient", "FURIA", "Falcons", 16, 14, 30, {"H1": [7, 5], "H2": [5, 7], "OT": [4, 2]}),
     "furia-vs-falcons-m2-dust2.dem": ("de_dust2", "Falcons", "FURIA", 5, 13, 12, {"H1": [1, 5], "H2": [0, 6]}),

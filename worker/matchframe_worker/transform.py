@@ -15,7 +15,7 @@ import polars as pl
 
 from . import WORKER_VERSION
 from .errors import NoPlayableRounds
-from .ammo import estimate_reserve, has_ammo
+from .ammo import has_ammo
 from .maps import MapInfo
 from .raw import RawDemo
 
@@ -364,7 +364,7 @@ def build(
         if clans:
             teams[key] = {"key": key, "name": clans.most_common(1)[0][0], "nameSource": "clan", "startSide": start_side}
         else:
-            teams[key] = {"key": key, "name": f"Team {key}", "nameSource": "fallback", "startSide": start_side}
+            teams[key] = {"key": key, "name": {"A": "Team Alpha", "B": "Team Bravo"}[key], "nameSource": "fallback", "startSide": start_side}
 
     players = [
         {"id": pid, "name": names[pid], "steamId": steam[pid], "isBot": pid.startswith("b:"), "team": team_of[pid]}
@@ -535,7 +535,7 @@ def _capabilities(raw: RawDemo, samples: pl.DataFrame, m: MapInfo, timing: dict,
         "armor": _col(samples, "armor"),
         "money": _col(samples, "money"),
         "ammo": _col(samples, "clip"),
-        "reserveAmmo": "estimated" if _col(samples, "clip") else "none",
+        "reserveAmmo": "recorded" if _col(samples, "reserve") else "none",
         "inventory": _col(samples, "inventory"),
         "economy": _col(samples, "equipment_value"),
         "bombPosition": _col(raw.bomb, "x"),
@@ -674,6 +674,7 @@ def _round_payload(
             # -1 = not applicable (melee, grenades, bomb) or unknown.
             gun = has_ammo(r.get("active_weapon")) and is_alive
             clip.append(int(r["clip"]) if gun and r.get("clip") is not None and r["clip"] >= 0 else -1)
+            reserve.append(int(r["reserve"]) if gun and r.get("reserve") is not None and r["reserve"] >= 0 else -1)
 
             flags.append(f)
             floor.append(fl)
@@ -699,7 +700,7 @@ def _round_payload(
                 "money": money if "money" in cols else None,
                 "weapon": wpn if "active_weapon" in cols else None,
                 "clip": clip if "clip" in cols else None,
-                "reserve": estimate_reserve([weapons[i] if i >= 0 else None for i in wpn], clip) if "clip" in cols else None,
+                "reserve": reserve if "reserve" in cols else None,
                 "flags": flags,
                 "floor": floor,
                 "disc": disc,
