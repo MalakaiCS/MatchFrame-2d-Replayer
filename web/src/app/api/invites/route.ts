@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/access";
-import { billing, planFor } from "@/lib/billing";
+import { billing, planFor, syncTeamSeats } from "@/lib/billing";
 import { tx } from "@/lib/db";
 import { badRequest, body, json, notFound, route } from "@/lib/http";
 import { sha256 } from "@/lib/ids";
@@ -35,7 +35,8 @@ export const POST = route(async (req: Request) => {
   const user = await requireUser(req);
   const { token } = await body(req, Accept);
   if (!validToken(token)) throw notFound();
-  return tx(async (c) => {
+  let joinedTeam: string | null = null;
+  const res = await tx(async (c) => {
     const inv = (await c.query(
       `select i.id, i.team_id, i.role from team_invites i where i.token_hash = $1 and ${LIVE} for update`, [sha256(token)])).rows[0];
     if (!inv) throw notFound();
@@ -48,6 +49,9 @@ export const POST = route(async (req: Request) => {
     }
     await c.query("insert into team_members(team_id, user_id, role) values ($1,$2,$3)", [inv.team_id, user.id, inv.role]);
     await c.query("update team_invites set uses = uses + 1 where id = $1", [inv.id]);
+    joinedTeam = inv.team_id;
     return json({ teamId: inv.team_id, joined: true, role: inv.role }, { status: 201 });
   });
+  if (joinedTeam) await syncTeamSeats(joinedTeam);
+  return res;
 });

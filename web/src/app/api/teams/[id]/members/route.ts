@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MANAGE_ROLES, requireUser, userTeams } from "@/lib/access";
-import { billing, planFor } from "@/lib/billing";
+import { billing, planFor, syncTeamSeats } from "@/lib/billing";
 import { q, q1 } from "@/lib/db";
 import { badRequest, body, forbidden, json, notFound, route } from "@/lib/http";
 
@@ -33,5 +33,6 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
      on conflict (team_id, user_id) do update set role = excluded.role`,
     [id, target.id, p.role],
   );
+  await syncTeamSeats(id);
   return json({ ok: true, userId: target.id }, { status: 201 });
 });

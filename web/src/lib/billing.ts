@@ -29,7 +29,20 @@ export const billing = {
   configured: () => !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_PERSONAL && process.env.STRIPE_PRICE_TEAM),
   /** Optional cap on members of a team with a team plan (0 or unset: no cap). */
   teamMemberLimit: () => Number(process.env.TEAM_PLAN_MAX_MEMBERS ?? 0) || 0,
+  /** Team plan charged per member (Stripe quantity = members, kept in sync). */
+  perSeat: () => process.env.TEAM_PLAN_PER_SEAT === "1",
+  /** Seats billed at least (per-seat mode). */
+  minSeats: () => Math.max(1, Number(process.env.TEAM_PLAN_MIN_SEATS ?? 1) || 1),
 };
+
+export type Interval = "month" | "year";
+
+/** Stripe price id for a plan and billing interval; yearly prices are optional. */
+export function priceId(kind: PlanKind, interval: Interval): string | null {
+  const env = process.env;
+  if (interval === "year") return (kind === "personal" ? env.STRIPE_PRICE_PERSONAL_YEARLY : env.STRIPE_PRICE_TEAM_YEARLY) || null;
+  return (kind === "personal" ? env.STRIPE_PRICE_PERSONAL : env.STRIPE_PRICE_TEAM) || null;
+}
 
 export const paymentRequired = (message: string) => new HttpError(402, "SUBSCRIPTION_REQUIRED", message);
 
@@ -133,9 +146,10 @@ export async function planFor(owner: { userId: string } | { teamId: string }): P
 /** Price shown on the plans page, read from Stripe and cached for ten minutes. */
 const priceCache = new Map<string, { at: number; value: PriceView | null }>();
 export interface PriceView { amount: number; currency: string; interval: string | null; intervalCount: number }
-export async function priceFor(kind: PlanKind): Promise<PriceView | null> {
+export async function priceFor(kind: PlanKind, interval: Interval = "month"): Promise<PriceView | null> {
   if (!billing.configured()) return null;
-  const id = kind === "personal" ? process.env.STRIPE_PRICE_PERSONAL! : process.env.STRIPE_PRICE_TEAM!;
+  const id = priceId(kind, interval);
+  if (!id) return null;
   const hit = priceCache.get(id);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.value;
   let value: PriceView | null = null;
@@ -204,4 +218,34 @@ export async function applyStripeSubscription(sub: Stripe.Subscription, eventCre
 
 export function appOrigin() {
   return (process.env.APP_ORIGIN ?? "http://localhost:3000").replace(/\/+$/, "");
+}
+
+/** Members to bill for a team (per-seat mode). */
+export async function seatCount(teamId: string): Promise<number> {
+  const r = await q1<{ n: number }>("select count(*)::int as n from team_members where team_id = $1", [teamId]);
+  return Math.max(billing.minSeats(), r?.n ?? 0);
+}
+
+/**
+ * Per-seat mode: set the team's active Stripe subscription quantity to its member count (prorated).
+ * Best effort: a failure is logged and the next membership change (or a webhook) corrects it.
+ */
+export async function syncTeamSeats(teamId: string): Promise<void> {
+  if (!billing.enabled() || !billing.configured() || !billing.perSeat()) return;
+  const sub = await q1<{ stripe_subscription_id: string }>(
+    `select stripe_subscription_id from subscriptions s where s.team_id = $1 and s.provider = 'stripe' and ${activeSql(2)}
+      order by s.updated_at desc limit 1`, [teamId, ACTIVE]);
+  if (!sub?.stripe_subscription_id) return;
+  try {
+    const st = stripe();
+    const current = await st.subscriptions.retrieve(sub.stripe_subscription_id);
+    const item = current.items.data[0];
+    const want = await seatCount(teamId);
+    if (!item || item.quantity === want) return;
+    await st.subscriptions.update(sub.stripe_subscription_id, {
+      items: [{ id: item.id, quantity: want }], proration_behavior: "create_prorations",
+    });
+  } catch (e) {
+    console.error("[billing] seat sync failed for team", teamId, e instanceof Error ? e.message : e);
+  }
 }

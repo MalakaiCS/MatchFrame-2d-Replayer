@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MANAGE_ROLES, requireUser, userTeams } from "@/lib/access";
+import { syncTeamSeats } from "@/lib/billing";
 import { q, q1 } from "@/lib/db";
 import { badRequest, body, forbidden, json, notFound, route } from "@/lib/http";
 
@@ -38,5 +39,6 @@ export const DELETE = route(async (req: Request, ctx: Ctx) => {
   const { id, userId } = await guard(req, ctx);
   await assertOwnerRemains(id, userId);
   await q("delete from team_members where team_id = $1 and user_id = $2", [id, userId]);
+  await syncTeamSeats(id);
   return json({ ok: true });
 });

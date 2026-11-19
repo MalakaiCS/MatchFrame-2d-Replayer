@@ -11,8 +11,11 @@ interface BillingState {
   configured: boolean;
   teamMemberLimit: number | null;
   prices: { personal: PriceView | null; team: PriceView | null };
+  yearly: { personal: PriceView | null; team: PriceView | null };
+  perSeat: boolean;
+  minSeats: number;
   personal: Plan | null;
-  teams: { id: string; name: string; role: string; canManageBilling: boolean; plan: Plan | null }[];
+  teams: { id: string; name: string; role: string; canManageBilling: boolean; members: number; plan: Plan | null }[];
   access: { personal: boolean; coveredTeams: string[]; canUse: boolean };
 }
 
@@ -37,6 +40,7 @@ export function BillingPage() {
   const params = useSearchParams();
   const [s, setS] = useState<BillingState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [interval, setInterval_] = useState<"month" | "year">("month");
   const [error, setError] = useState<string | null>(null);
   const checkout = params.get("checkout");
 
@@ -68,7 +72,20 @@ export function BillingPage() {
     }
   }
 
-  const price = (k: "personal" | "team") => formatPrice(s?.prices[k]);
+  const hasYearly = !!(s?.yearly.personal || s?.yearly.team);
+  const view = (k: "personal" | "team") => (interval === "year" ? s?.yearly[k] : s?.prices[k]) ?? null;
+  const price = (k: "personal" | "team") => {
+    const f = formatPrice(view(k));
+    return f && k === "team" && s?.perSeat ? f.replace(" / ", " per member / ") : f;
+  };
+  /** Yearly saving against twelve monthly payments. */
+  const saving = (k: "personal" | "team") => {
+    const m = s?.prices[k];
+    const y = s?.yearly[k];
+    if (!m || !y || m.interval !== "month" || y.interval !== "year" || m.currency !== y.currency) return null;
+    const pct = Math.round(100 * (1 - y.amount / (m.amount * 12)));
+    return pct > 0 ? pct : null;
+  };
   const canPay = !!s?.enabled && !!s.configured;
   const ownedTeams = s?.teams.filter((t) => t.canManageBilling) ?? [];
 
@@ -85,6 +102,15 @@ export function BillingPage() {
       ) : null}
       {s && s.enabled && !s.configured ? (
         <p className="alert alert-warn" role="status">Online payments are not set up yet. Ask the site operator to grant you a plan.</p>
+      ) : null}
+
+      {hasYearly ? (
+        <div className="ins-group" role="group" aria-label="Billing period" style={{ marginBottom: 12 }}>
+          <button type="button" className="chip" aria-pressed={interval === "month"} onClick={() => setInterval_("month")}>Monthly</button>
+          <button type="button" className="chip" aria-pressed={interval === "year"} onClick={() => setInterval_("year")}>
+            Yearly{saving("personal") || saving("team") ? ` · save up to ${Math.max(saving("personal") ?? 0, saving("team") ?? 0)}%` : ""}
+          </button>
+        </div>
       ) : null}
 
       <div className="plan-grid">
@@ -105,7 +131,7 @@ export function BillingPage() {
                 {busy === "portal-personal" ? "Opening…" : "Manage billing"}
               </button>
             ) : !s?.personal?.active ? (
-              <button className="btn btn-primary" disabled={!canPay || busy !== null} onClick={() => go("/api/billing/checkout", { kind: "personal" }, "buy-personal")}>
+              <button className="btn btn-primary" disabled={!canPay || busy !== null} onClick={() => go("/api/billing/checkout", { kind: "personal", interval }, "buy-personal")}>
                 {busy === "buy-personal" ? "Opening checkout…" : "Get Personal"}
               </button>
             ) : null}
@@ -123,6 +149,7 @@ export function BillingPage() {
           <ul className="plan-points">
             {PLAN_COPY.team.points.map((p) => <li key={p}>{p}</li>)}
             {s?.teamMemberLimit ? <li>Up to {s.teamMemberLimit} members</li> : null}
+            {s?.perSeat ? <li>Billed per member; adding or removing members adjusts the next invoice</li> : null}
           </ul>
           <div className="plan-teams">
             {s && s.teams.length === 0 ? (
@@ -130,7 +157,15 @@ export function BillingPage() {
             ) : null}
             {s?.teams.map((t) => (
               <div key={t.id} className="plan-team-row">
-                <strong className="grow">{t.name}</strong>
+                <strong className="grow">
+                  {t.name}
+                  {s?.perSeat ? (
+                    <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
+                      {" "}· {t.members} member{t.members === 1 ? "" : "s"}
+                      {view("team") ? ` · ${formatPrice({ ...view("team")!, amount: view("team")!.amount * Math.max(s.minSeats, t.members) })}` : ""}
+                    </span>
+                  ) : null}
+                </strong>
                 <PlanStatus plan={t.plan} />
                 {t.canManageBilling ? (
                   t.plan?.active ? (
@@ -140,7 +175,7 @@ export function BillingPage() {
                       </button>
                     ) : null
                   ) : (
-                    <button className="btn btn-sm btn-primary" disabled={!canPay || busy !== null} onClick={() => go("/api/billing/checkout", { kind: "team", teamId: t.id }, `buy-${t.id}`)}>
+                    <button className="btn btn-sm btn-primary" disabled={!canPay || busy !== null} onClick={() => go("/api/billing/checkout", { kind: "team", teamId: t.id, interval }, `buy-${t.id}`)}>
                       {busy === `buy-${t.id}` ? "Opening checkout…" : "Get Team plan"}
                     </button>
                   )

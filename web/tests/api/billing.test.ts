@@ -4,6 +4,7 @@
  *
  *   BILLING_ENABLED=1 STRIPE_SECRET_KEY=sk_test_fake STRIPE_WEBHOOK_SECRET=whsec_test \
  *   STRIPE_PRICE_PERSONAL=price_personal STRIPE_PRICE_TEAM=price_team TEAM_PLAN_MAX_MEMBERS=3 \
+ *   STRIPE_PRICE_PERSONAL_YEARLY=price_personal_year STRIPE_PRICE_TEAM_YEARLY=price_team_year TEAM_PLAN_PER_SEAT=1 \
  *   STRIPE_API_HOST=localhost STRIPE_API_PORT=12111 STRIPE_API_PROTOCOL=http \
  *   AUTH_RATE_LIMIT=0 npx next start -p 3001
  *   MF_BASE_URL=http://localhost:3000 MF_BILLING_BASE_URL=http://localhost:3001 npx vitest run tests/api/billing.test.ts
@@ -77,6 +78,11 @@ function startFake() {
       if (req.method === "POST" && p === "/v1/billing_portal/sessions") return send({ id: "bps_1", object: "billing_portal.session", url: "https://billing.stripe.test/session" });
       if (req.method === "GET" && p === "/v1/prices/price_personal") return send({ id: "price_personal", object: "price", unit_amount: 900, currency: "gbp", recurring: { interval: "month", interval_count: 1 } });
       if (req.method === "GET" && p === "/v1/prices/price_team") return send({ id: "price_team", object: "price", unit_amount: 4900, currency: "gbp", recurring: { interval: "month", interval_count: 1 } });
+      if (req.method === "GET" && p === "/v1/prices/price_personal_year") return send({ id: "price_personal_year", object: "price", unit_amount: 9000, currency: "gbp", recurring: { interval: "year", interval_count: 1 } });
+      if (req.method === "GET" && p === "/v1/prices/price_team_year") return send({ id: "price_team_year", object: "price", unit_amount: 49000, currency: "gbp", recurring: { interval: "year", interval_count: 1 } });
+      const subMatch = p.match(/^\/v1\/subscriptions\/([A-Za-z0-9_]+)$/);
+      if (subMatch && req.method === "GET") return send({ id: subMatch[1], object: "subscription", items: { object: "list", data: [{ id: "si_seat", object: "subscription_item", quantity: 2 }] } });
+      if (subMatch && req.method === "POST") return send({ id: subMatch[1], object: "subscription" });
       send({ error: { type: "invalid_request_error", message: `fake stripe: no route ${req.method} ${p}` } }, 404);
     });
   });
@@ -175,6 +181,8 @@ describe.skipIf(!BASE)("plans", () => {
     await tom.json("/api/billing/checkout", { method: "POST", json: { kind: "team", teamId } }, 201);
     const sess = calls.filter((c) => c.path === "/v1/checkout/sessions").at(-1)!.body;
     expect(sess.get("line_items[0][price]")).toBe("price_team");
+    // Per-seat: the team (tom + mia) starts at two seats.
+    expect(sess.get("line_items[0][quantity]")).toBe("2");
     expect(sess.get("subscription_data[metadata][teamId]")).toBe(teamId);
 
     // Before the webhook nobody on the team is covered.
@@ -226,9 +234,22 @@ describe.skipIf(!BASE)("plans", () => {
     expect((await zed.req("/api/uploads", { method: "POST", json: { filename: "a.dem", size: 10 } })).status).toBe(402);
   });
 
+  it("offers yearly billing and shows both prices", async () => {
+    const b = await sam.json("/api/billing", {}, 200);
+    expect(b.yearly.personal).toMatchObject({ amount: 9000, interval: "year" });
+    expect(b.perSeat).toBe(true);
+    await sam.json("/api/billing/checkout", { method: "POST", json: { kind: "personal", interval: "year" } }, 201);
+    expect(calls.filter((c) => c.path === "/v1/checkout/sessions").at(-1)!.body.get("line_items[0][price]")).toBe("price_personal_year");
+    expect((await sam.req("/api/billing/checkout", { method: "POST", json: { kind: "personal", interval: "week" } })).status).toBe(400);
+  });
+
   it("caps team size when TEAM_PLAN_MAX_MEMBERS is set", async () => {
     // tom + mia already; the cap in this test server is 3.
     await tom.json(`/api/teams/${teamId}/members`, { method: "POST", json: { email: zed.email, role: "viewer" } }, 201);
+    // Per-seat: the Stripe subscription follows the roster (2 -> 3 seats, prorated).
+    const upd = calls.filter((c) => c.method === "POST" && c.path === `/v1/subscriptions/sub_t_${run}`).at(-1);
+    expect(upd?.body.get("items[0][quantity]")).toBe("3");
+    expect(upd?.body.get("proration_behavior")).toBe("create_prorations");
     const full = await tom.json(`/api/teams/${teamId}/members`, { method: "POST", json: { email: sam.email, role: "viewer" } }, 400);
     expect(full.error.code).toBe("TEAM_FULL");
     // Changing an existing member's role is not blocked by the cap.

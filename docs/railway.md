@@ -127,3 +127,12 @@ node scripts/grant-plan.mjs list
 ```bash
 node scripts/grant-plan.mjs revoke personal player@example.com
 ```
+
+### Yearly and per-seat pricing (optional)
+
+- **Yearly:** create a yearly recurring price for each product in Stripe and set
+  `STRIPE_PRICE_PERSONAL_YEARLY` and/or `STRIPE_PRICE_TEAM_YEARLY`. The plans page then shows a
+  Monthly / Yearly switch with the saving.
+- **Per seat:** set `TEAM_PLAN_PER_SEAT=1` and make the Team price a per-unit price ("£X per member").
+  Checkout starts at the team's member count (at least `TEAM_PLAN_MIN_SEATS`), and adding or removing
+  members (by email, invite link or removal) updates the subscription quantity with proration.

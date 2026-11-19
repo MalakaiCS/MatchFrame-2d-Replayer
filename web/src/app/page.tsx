@@ -101,8 +101,13 @@ function Icon({ children }: { children: React.ReactNode }) {
 export const revalidate = 600;
 
 export default async function Landing() {
-  const [personalPrice, teamPrice] = await Promise.all([priceFor("personal"), priceFor("team")]).catch(() => [null, null]);
-  const prices = { personal: formatPrice(personalPrice), team: formatPrice(teamPrice) };
+  const [personalPrice, teamPrice, personalYear, teamYear] = await Promise.all([
+    priceFor("personal"), priceFor("team"), priceFor("personal", "year"), priceFor("team", "year"),
+  ]).catch(() => [null, null, null, null]);
+  const perSeat = process.env.TEAM_PLAN_PER_SEAT === "1";
+  const seat = (v: string | null) => (v && perSeat ? v.replace(" / ", " per member / ") : v);
+  const prices = { personal: formatPrice(personalPrice), team: seat(formatPrice(teamPrice)) };
+  const yearly = { personal: formatPrice(personalYear), team: seat(formatPrice(teamYear)) };
   return (
     <div className="mk">
       {/* ---------- hero ---------- */}
@@ -301,6 +306,7 @@ export default async function Landing() {
                   <h3>{PLAN_COPY[k].name}</h3>
                   <p>{PLAN_COPY[k].tagline}</p>
                   {prices[k] ? <p className="mk-plan-price">{prices[k]}</p> : null}
+                  {yearly[k] ? <p style={{ margin: "4px 0 0", fontSize: 13 }}>or {yearly[k]}</p> : null}
                 </header>
                 <ul>{PLAN_COPY[k].points.map((p) => <li key={p}>{p}</li>)}</ul>
                 <Link className={`mk-btn${k === "team" ? " mk-btn-primary" : ""}`} href={`/signup?next=${encodeURIComponent("/billing")}`}>
