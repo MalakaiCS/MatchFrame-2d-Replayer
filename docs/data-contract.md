@@ -109,3 +109,37 @@ audio/<replay>/<track>.mp3
 ```
 
 Each processing attempt writes to its own prefix. Publication is a conditional update that records the prefix and requires the job's lease to still be valid, so a stale worker cannot overwrite a replacement. Abandoned prefixes are removed by maintenance.
+
+
+## Player stats (worker 0.2.0+)
+
+Each round summary carries `playerStats`: one record per player who played the round
+(`web/src/shared/contract.ts` → `PlayerRoundStats`, producer `worker/matchframe_worker/stats.py`).
+
+| Field | Meaning |
+|---|---|
+| `k`, `d`, `a` | Enemy kills; deaths from any cause; assists, flash assists included |
+| `fa` | Flash assists (also counted in `a`) |
+| `hs` | Headshot kills |
+| `tk` | Team kills (not in `k`) |
+| `dmg` | Health damage to enemies until the round is decided. Each hit is capped at the victim's health left, tracked through the round from 100 |
+| `ud` | The part of `dmg` from HE grenades and fire |
+| `ef`, `fd` | Enemies flashed and their total blind time (seconds) |
+| `ok`, `od` | Opening kill and opening death (the round's first kill) |
+| `trk`, `trd` | Trade kills; traded death (the killer died to a teammate of the victim within 5 seconds) |
+| `surv`, `kast` | Survived the round; KAST (kill, assist, survived or traded) |
+| `cl`, `cw` | Clutch: enemies alive when the player became the last of their side (0 = none), and whether that side won |
+| `eq` | Equipment value at freeze end |
+
+Match figures in the viewer are sums over the rounds shown: ADR = `dmg` / rounds, KAST% = `kast` / rounds.
+
+**Checks against real demos** (`worker/tools/stats_check.py`, compared with Awpy 3.3.0's match stats):
+kills, deaths, headshots, opening kills and deaths, clutches played and won, utility damage and enemies
+flashed match Awpy for every player on the demos checked; assists and traded deaths match for all but one
+or two players. ADR differs by a few points: the parser's per-event "health before" value is unreliable
+(it often repeats the round-start value), so Matchframe tracks each victim's health itself. With this
+method, 132 of 136 players killed by an enemy on the Nuke demo took exactly 100 damage that round; the
+other 4 were within 3 HP (fall damage).
+
+Older replays have no `playerStats`. Re-parsing needs the original demo (`KEEP_SOURCE_AFTER_PARSE=1`
+keeps it; otherwise upload the demo again). `web/scripts/reprocess-all.mjs` queues re-parses in bulk.

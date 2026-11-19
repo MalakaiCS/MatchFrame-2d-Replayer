@@ -22,6 +22,8 @@ interface Props {
   /** Owners and coaches can create a public link to the current round. */
   canManage: boolean;
   onRoundLink: () => void;
+  /** The original demo is still stored (re-processing possible). */
+  sourceAvailable: boolean;
 }
 
 export function ShareDialog(p: Props) {
@@ -100,6 +102,17 @@ export function ShareDialog(p: Props) {
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not share.");
+    }
+  }
+
+  const [reprocessing, setReprocessing] = useState(false);
+  async function reprocess() {
+    setError(null);
+    try {
+      await api(`/api/replays/${p.replayId}/reprocess`, { method: "POST" });
+      setReprocessing(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not queue the re-process.");
     }
   }
 
@@ -191,6 +204,16 @@ export function ShareDialog(p: Props) {
 
           <hr style={{ borderColor: "var(--border)", margin: "16px 0" }} />
           <section className="row">
+            <span className="grow faint" style={{ fontSize: 12 }}>
+              {p.sourceAvailable
+                ? "Re-process with the latest parser (adds new data such as player stats). The current version stays playable meanwhile."
+                : "The original demo is no longer stored, so this replay cannot be re-processed. Upload the demo again for new data."}
+            </span>
+            <button type="button" className="btn" disabled={!p.sourceAvailable || reprocessing} onClick={reprocess}>
+              {reprocessing ? "Queued" : "Re-process"}
+            </button>
+          </section>
+          <section className="row" style={{ marginTop: 10 }}>
             <span className="grow faint" style={{ fontSize: 12 }}>Deleting removes the replay, its links and its recordings.</span>
             <button type="button" className="btn btn-danger" onClick={del}>Delete replay</button>
           </section>

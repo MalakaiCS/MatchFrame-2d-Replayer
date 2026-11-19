@@ -13,6 +13,7 @@ from typing import Any, Iterable
 
 import polars as pl
 
+from .stats import round_player_stats
 from . import WORKER_VERSION
 from .errors import NoPlayableRounds
 from .ammo import has_ammo
@@ -406,6 +407,7 @@ def build(
         half, is_ot, is_pistol, is_ot_start = _round_meta(display, timing["maxRounds"], timing["overtimeMaxRounds"])
 
         economy = {}
+        equipment: dict[str, int | None] = {}
         anchor = rd.freeze_end if rd.freeze_end is not None else rd.start
         for key in ("A", "B"):
             members = [p for p, t in team_of.items() if t == key]
@@ -418,6 +420,8 @@ def build(
                     .agg(pl.col("equipment_value").first())
                 )
                 n = snap.height
+                for row in snap.to_dicts():
+                    equipment[row["pid"]] = None if row["equipment_value"] is None else int(row["equipment_value"])
                 vals = [v for v in snap["equipment_value"].to_list() if v is not None]
                 val = int(sum(vals)) if vals else None
             parser_bt = econ_by_round.get((rd.num, sides[key]))
@@ -431,6 +435,11 @@ def build(
         payload, coverage, planted = _round_payload(raw, samples, rd, rid, map_info, sample_every, cfg, raw.tick_rate)
         payloads[rid] = payload
         coverage = {pid: coverage.get(pid, 0.0) for pid in sorted(names)}
+        player_stats = round_player_stats(
+            start=rd.start, end=rd.end, decided=rd.decided, sides=sides_at_round(rd), winner_side=rd.winner_side,
+            kills=raw.kills, damages=raw.damages, blinds=raw.blinds, pid_of=player_id,
+            tick_rate=raw.tick_rate, equipment=equipment,
+        )
         summaries.append(
             {
                 "id": rid,
@@ -453,6 +462,7 @@ def build(
                 "economy": economy,
                 "coverage": coverage,
                 "bombPlanted": planted,
+                "playerStats": player_stats,
                 "payload": {"key": f"{prefix}/rounds/{rid}.json.gz", "bytes": 0, "sha256": ""},
             }
         )
@@ -461,6 +471,8 @@ def build(
         warnings.append(f"Computed score differs from the in-game scoreboard before {mismatches} round(s).")
     caps = _capabilities(raw, samples, map_info, timing, summaries)
     caps["recordingStartsAtRound"] = offset + 1
+    caps["damage"] = raw.damages is not None and raw.damages.height > 0
+    caps["blinds"] = raw.blinds is not None and raw.blinds.height > 0
     manifest = {
         "schemaVersion": SCHEMA_VERSION,
         "replayId": replay_id,

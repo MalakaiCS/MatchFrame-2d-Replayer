@@ -771,7 +771,8 @@ function Workspace({
 
       <ShareDialog open={shareOpen} onClose={() => { setShareOpen(false); reload(); }} replayId={id} roundId={round.id} roundMs={roundMs}
         isOwner={data.access.via === "owner"} viaShare={viaShare} teams={teams} replayTeamId={data.replay.teamId} visibility={data.replay.visibility} onChanged={reload}
-        roundNumber={round.displayNumber} canManage={data.access.canManage} onRoundLink={() => copyRoundLink(round.id)} />
+        roundNumber={round.displayNumber} canManage={data.access.canManage} onRoundLink={() => copyRoundLink(round.id)}
+        sourceAvailable={data.replay.sourceAvailable} />
       <ShortcutsDialog open={kbdOpen} onClose={() => setKbdOpen(false)} />
     </div>
   );

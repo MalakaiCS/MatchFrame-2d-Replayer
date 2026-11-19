@@ -69,7 +69,7 @@ def _open(path: str):
     from awpy import Demo
 
     demo = Demo(path)
-    demo.load("rounds", "kills", "bomb", "grenades", "smokes", "fires", "players", "round_economy")
+    demo.load("rounds", "kills", "damages", "blinds", "bomb", "grenades", "smokes", "fires", "players", "round_economy")
     return demo
 
 
@@ -144,6 +144,8 @@ def load(path: str, *, sample_every: int) -> RawDemo:
         )
 
     kills = _ids(demo.kills, ["attacker_steamid", "victim_steamid", "assister_steamid"])
+    damages = _ids(demo.damages, ["attacker_steamid", "victim_steamid"]) if demo.damages is not None else None
+    blinds = _ids(demo.blinds, ["attacker_steamid", "victim_steamid"]) if demo.blinds is not None else None
 
     bomb = demo.bomb
     if bomb.height:
@@ -258,6 +260,8 @@ def load(path: str, *, sample_every: int) -> RawDemo:
         clan_names=clan_names,
         warnings=warnings,
         team_scores=team_scores,
+        damages=damages,
+        blinds=blinds,
     )
 
 

@@ -53,6 +53,9 @@ export interface Capabilities {
   ammo?: boolean;
   /** "recorded": reserve read from the weapon entity; "none": not extracted (magazine only). */
   reserveAmmo?: "recorded" | "none" | "estimated";
+  /** Damage and blind events were recorded (ADR, utility damage, flashes). Worker 0.2.0+. */
+  damage?: boolean;
+  blinds?: boolean;
   inventory: boolean;
   economy: boolean;
   bombPosition: boolean;
@@ -97,7 +100,28 @@ export interface RoundSummary {
   /** POV / partial demos: share of the round each player has samples for (0..1). */
   coverage: Record<string, number>;
   bombPlanted: boolean;
+  /** Per-player stats for this round (worker 0.2.0+; absent on older replays). See docs/data-contract.md. */
+  playerStats?: Record<string, PlayerRoundStats>;
   payload: { key: string; bytes: number; sha256: string };
+}
+
+/** One player's stats in one round. Definitions: docs/data-contract.md, "Player stats". */
+export interface PlayerRoundStats {
+  side: Side;
+  /** Enemy kills, deaths, assists (flash assists included), flash assists, headshot kills, team kills. */
+  k: number; d: number; a: number; fa: number; hs: number; tk: number;
+  /** Health damage to enemies (capped at health left, until the round is decided) and the utility part of it. */
+  dmg: number; ud: number;
+  /** Enemies flashed and total enemy blind seconds. */
+  ef: number; fd: number;
+  /** Opening kill / death, trade kills, traded death. */
+  ok: number; od: number; trk: number; trd: number;
+  /** Survived the round; KAST (kill, assist, survived or traded). */
+  surv: number; kast: number;
+  /** Clutch: enemies alive when this player became the last of their side (0 = no clutch), and whether it was won. */
+  cl: number; cw: number;
+  /** Equipment value at freeze end, when recorded. */
+  eq: number | null;
 }
 
 export interface Manifest {
