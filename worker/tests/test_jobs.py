@@ -235,3 +235,12 @@ def test_priority_jobs_are_claimed_first(env):
     assert first["replay_id"] == paid
     second = jobs.claim(conn, "w-b", 60)
     assert second["replay_id"] == normal
+
+
+def test_abort_multipart_removes_part_files(env):
+    cfg, conn, storage, uid = env
+    key = f"uploads/{uid}/x.dem"
+    storage.put_bytes(f"{key}.parts/mp1/00001", b"a", "application/octet-stream")
+    storage.put_bytes(f"{key}.parts/mp1/00002", b"b", "application/octet-stream")
+    storage.abort_multipart(key, "mp1")
+    assert not storage.exists(f"{key}.parts/mp1/00001")

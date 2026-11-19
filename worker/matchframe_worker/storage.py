@@ -19,6 +19,7 @@ class Storage(Protocol):
     def delete(self, key: str) -> None: ...
     def delete_prefix(self, prefix: str) -> int: ...
     def list_prefixes(self, prefix: str) -> list[str]: ...
+    def abort_multipart(self, key: str, upload_id: str) -> None: ...
 
 
 def _safe(key: str) -> str:
@@ -85,6 +86,10 @@ class FsStorage:
         if not p.is_dir():
             return []
         return [f"{prefix.rstrip('/')}/{c.name}" for c in p.iterdir() if c.is_dir()]
+
+    def abort_multipart(self, key: str, upload_id: str) -> None:
+        """Remove part files of an unfinished resumable upload (web: key.parts/<id>/)."""
+        self.delete_prefix(f"{key}.parts/{upload_id}/")
 
 
 class S3Storage:
@@ -169,3 +174,10 @@ def make_storage(cfg) -> Storage:
     if cfg.storage_driver == "s3":
         return S3Storage(cfg.s3_bucket, cfg.s3_endpoint, cfg.s3_region)
     return FsStorage(cfg.storage_fs_root)
+
+    def abort_multipart(self, key: str, upload_id: str) -> None:
+        """Abort an unfinished multipart upload so its parts stop costing storage."""
+        try:
+            self.s3.abort_multipart_upload(Bucket=self.bucket, Key=_safe(key), UploadId=upload_id)
+        except Exception:  # noqa: BLE001 - already completed or aborted
+            pass

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { clearResume, uploadDemo } from "./upload";
 import { PlanNotice } from "./BillingPage";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +36,7 @@ export function UploadFlow() {
     return to && to !== "personal" ? to : "";
   });
   const [file, setFile] = useState<File | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -103,11 +105,10 @@ export function UploadFlow() {
     abort.current = new AbortController();
     try {
       setStage("uploading");
-      const slot = await api<UploadSlot>("/api/uploads", { method: "POST", json: { filename: file.name, size: file.size, teamId: String(form.get("teamId") || "") || null } });
-      await putWithProgress(slot.upload.url, file, slot.upload.headers, setProgress, abort.current.signal);
+      const uploadId = await uploadDemo(file, String(form.get("teamId") || "") || null, setProgress, abort.current.signal, setNote);
       setStage("finalising");
       const seriesId = String(form.get("seriesId") || "").trim();
-      const done = await api<{ replayId: string; status: string }>(`/api/uploads/${slot.uploadId}/complete`, {
+      const done = await api<{ replayId: string; status: string }>(`/api/uploads/${uploadId}/complete`, {
         method: "POST",
         json: {
           title: String(form.get("title") || "") || undefined,
@@ -116,6 +117,7 @@ export function UploadFlow() {
           seriesMapIndex: seriesId ? Number(form.get("seriesMapIndex") || 1) : null,
         },
       });
+      clearResume(file);
       setReplayId(done.replayId);
       setStage("processing");
     } catch (err) {
@@ -192,6 +194,7 @@ export function UploadFlow() {
       {stage === "uploading" || stage === "finalising" ? (
         <div className="card stack" aria-live="polite">
           <div>{stage === "uploading" ? `Uploading ${file?.name}… ${(progress * 100).toFixed(0)}%` : "Verifying upload…"}</div>
+          {note ? <div className="faint" style={{ fontSize: 12 }}>{note}</div> : null}
           <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
             <div style={{ width: `${progress * 100}%` }} />
           </div>
@@ -245,10 +248,10 @@ function BulkQueue({ files, dest, teams, onDone }: { files: File[]; dest: string
         const bad = await sniff(f);
         if (bad) throw new Error(bad);
         patch(i, { state: "uploading" });
-        const slot = await api<UploadSlot>("/api/uploads", { method: "POST", json: { filename: f.name, size: f.size, teamId: dest || null } });
-        await putWithProgress(slot.upload.url, f, slot.upload.headers, (p) => patch(i, { progress: p }), new AbortController().signal);
-        patch(i, { state: "finalising" });
-        const done = await api<{ replayId: string }>(`/api/uploads/${slot.uploadId}/complete`, { method: "POST", json: { teamId: dest || null } });
+        const uploadId = await uploadDemo(f, dest || null, (p) => patch(i, { progress: p }), new AbortController().signal, (m) => patch(i, { message: m }));
+        patch(i, { state: "finalising", message: null });
+        const done = await api<{ replayId: string }>(`/api/uploads/${uploadId}/complete`, { method: "POST", json: { teamId: dest || null } });
+        clearResume(f);
         patch(i, { state: "processing", replayId: done.replayId });
       } catch (e) {
         patch(i, { state: "failed", message: e instanceof Error ? e.message : "The upload failed." });

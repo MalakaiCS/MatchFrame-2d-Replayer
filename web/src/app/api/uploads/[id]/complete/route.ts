@@ -40,6 +40,19 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
       return json({ replayId: r.id, status: r.status, duplicate: true });
     }
     if (up.status !== "pending") throw conflict("This upload slot has expired. Start the upload again.", "UPLOAD_EXPIRED");
+    if (up.multipart_id) {
+      // Resumable upload: every part must be there with its exact size, then the parts are stitched.
+      const declared = Number(up.declared_size);
+      const partSize = Number(up.part_size);
+      const n = Math.ceil(declared / partSize);
+      const sizeOf = (i: number) => (i < n ? partSize : declared - partSize * (n - 1));
+      const parts = (await storage.listParts(up.object_key, up.multipart_id)).filter((p) => p.partNumber <= n && p.size === sizeOf(p.partNumber));
+      if (parts.length !== n) {
+        throw badRequest(`${n - parts.length} of ${n} parts are still missing. Resume the upload to finish them.`, "UPLOAD_INCOMPLETE");
+      }
+      await storage.completeMultipart(up.object_key, up.multipart_id, parts);
+      await c.query("update uploads set multipart_id = null where id = $1", [id]);
+    }
     const size = await storage.size(up.object_key);
     if (size === null) throw badRequest("No file was received for this upload.", "UPLOAD_MISSING");
     if (size > Number(up.max_bytes) || size !== Number(up.declared_size)) {

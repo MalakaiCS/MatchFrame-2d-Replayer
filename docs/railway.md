@@ -136,3 +136,14 @@ node scripts/grant-plan.mjs revoke personal player@example.com
 - **Per seat:** set `TEAM_PLAN_PER_SEAT=1` and make the Team price a per-unit price ("£X per member").
   Checkout starts at the team's member count (at least `TEAM_PLAN_MIN_SEATS`), and adding or removing
   members (by email, invite link or removal) updates the subscription quantity with proration.
+
+## Resumable uploads
+
+Files of 32 MiB or more upload in 16 MiB parts (S3 multipart) and can be resumed for 24 hours:
+choosing the same file again after a dropped connection continues with the missing parts.
+
+- The bucket's CORS rule must allow `PUT` from the site's origin (already needed for uploads).
+  No extra exposed headers are needed: the server reads part ETags itself.
+- The worker aborts expired multipart uploads. As a safety net, add a bucket lifecycle rule that
+  aborts incomplete multipart uploads after 2 days, if your provider supports it.
+- Tunables: `UPLOAD_MULTIPART_MIN_BYTES`, `UPLOAD_PART_BYTES` (at least 5 MiB), `RESUMABLE_UPLOAD_HOURS`.

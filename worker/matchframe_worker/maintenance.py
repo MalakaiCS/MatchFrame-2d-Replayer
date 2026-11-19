@@ -19,8 +19,10 @@ def run(cfg: Config, conn, storage: Storage) -> dict:
     try:
         # 1. Incomplete uploads past their slot expiry.
         for u in conn.execute(
-            "select id, object_key from uploads where status = 'pending' and expires_at < now() - interval '10 minutes' limit 200"
+            "select id, object_key, multipart_id from uploads where status = 'pending' and expires_at < now() - interval '10 minutes' limit 200"
         ).fetchall():
+            if u.get("multipart_id"):
+                storage.abort_multipart(u["object_key"], u["multipart_id"])
             storage.delete(u["object_key"])
             conn.execute("update uploads set status = 'expired' where id = %s and status = 'pending'", (u["id"],))
             stats["expiredUploads"] += 1

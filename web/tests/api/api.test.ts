@@ -598,3 +598,35 @@ describe("my stats", () => {
   });
 });
 
+describe("resumable uploads", () => {
+  it("uploads a large demo in parts, refuses to finish with parts missing, and resumes", async () => {
+    // A synthetic demo padded with whitespace to 40 MiB (JSON ignores it) -> 3 parts of 16 MiB.
+    const head = synthetic({ map: "de_mirage", winners: "AB" });
+    const data = Buffer.concat([head, Buffer.alloc(40 * 1024 * 1024 - head.length, 0x20)]);
+    const slot = await owner.json("/api/uploads", { method: "POST", json: { filename: "big.dem", size: data.length, resumable: true } }, 201);
+    expect(slot.multipart).toEqual({ partSize: 16 * 1024 * 1024, parts: 3 });
+    expect(slot.upload).toBeUndefined();
+    expect((await outsider.req(`/api/uploads/${slot.uploadId}/parts`)).status).toBe(404);
+    const put = async (n: number, body = data.subarray((n - 1) * slot.multipart.partSize, Math.min(data.length, n * slot.multipart.partSize))) => {
+      const { targets } = await owner.json(`/api/uploads/${slot.uploadId}/parts`, { method: "POST", json: { partNumbers: [n] } }, 200);
+      return fetch(abs(targets[0].upload.url), { method: "PUT", body: new Uint8Array(body), headers: targets[0].upload.headers });
+    };
+    expect((await put(1)).status).toBe(200);
+    // A part of the wrong size is refused.
+    expect((await put(2, data.subarray(0, 1000))).status).toBe(400);
+    expect((await owner.json(`/api/uploads/${slot.uploadId}/parts`, {}, 200)).done).toEqual([1]);
+    const early = await owner.json(`/api/uploads/${slot.uploadId}/complete`, { method: "POST", json: {} }, 400);
+    expect(early.error.code).toBe("UPLOAD_INCOMPLETE");
+    // Resume: the remaining parts, then complete.
+    expect((await put(2)).status).toBe(200);
+    expect((await put(3)).status).toBe(200);
+    expect((await owner.json(`/api/uploads/${slot.uploadId}/parts`, {}, 200)).done).toEqual([1, 2, 3]);
+    const done = await owner.json(`/api/uploads/${slot.uploadId}/complete`, { method: "POST", json: {} }, 201);
+    const r = await waitReady(owner, done.replayId);
+    expect(r.replay.status).toBe("ready");
+    // Small files still use a single upload even when the client could resume.
+    const small = await owner.json("/api/uploads", { method: "POST", json: { filename: "s.dem", size: 100, resumable: true } }, 201);
+    expect(small.upload).toBeDefined();
+  }, 180_000);
+});
+

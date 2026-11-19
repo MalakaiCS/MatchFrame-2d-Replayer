@@ -18,4 +18,9 @@ export const env = {
     return s;
   },
   allowSignup: process.env.ALLOW_SIGNUP !== "0",
+  /** Files at least this big upload in parts and can be resumed (S3 needs parts of 5 MiB or more). */
+  multipartMinBytes: Number(process.env.UPLOAD_MULTIPART_MIN_BYTES ?? 32 * 1024 * 1024),
+  partBytes: Math.max(5 * 1024 * 1024, Number(process.env.UPLOAD_PART_BYTES ?? 16 * 1024 * 1024)),
+  /** How long an unfinished resumable upload can be continued. */
+  resumableHours: Number(process.env.RESUMABLE_UPLOAD_HOURS ?? 24),
 };

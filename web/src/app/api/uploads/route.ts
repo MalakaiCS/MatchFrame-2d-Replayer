@@ -17,12 +17,14 @@ const Req = z.object({
   size: z.number().int().positive(),
   /** Where the replay will go; checked against plans up front so a large upload is not wasted. */
   teamId: z.string().max(64).nullable().optional(),
+  /** The client can upload in parts and resume; large files then use a multipart upload. */
+  resumable: z.boolean().optional(),
 });
 
 /** Create a bounded, short-lived upload slot for one .dem file. */
 export const POST = route(async (req: Request) => {
   const user = await requireUser(req);
-  const { filename, size, teamId } = await body(req, Req);
+  const { filename, size, teamId, resumable } = await body(req, Req);
   if (teamId !== undefined) await assertCanUploadTo(user.id, teamId);
   else await assertCanStartUpload(user.id);
   const lower = filename.toLowerCase();
@@ -40,6 +42,18 @@ export const POST = route(async (req: Request) => {
   if ((pending?.n ?? 0) >= 10) throw badRequest("Too many uploads in progress. Finish or wait for them first.", "RATE_LIMITED");
   const id = newId();
   const key = `uploads/${user.id.replace(/[^A-Za-z0-9-]/g, "")}/${id}.dem`;
+  if (resumable && size >= env.multipartMinBytes) {
+    const multipartId = await getStorage().startMultipart(key, "application/octet-stream");
+    const row = await q1<{ expires_at: string }>(
+      `insert into uploads(id, owner_id, object_key, filename, declared_size, max_bytes, expires_at, multipart_id, part_size)
+       values ($1, $2, $3, $4, $5, $6, now() + make_interval(hours => $7), $8, $9) returning expires_at`,
+      [id, user.id, key, filename.slice(0, 255), size, env.maxDemoBytes, env.resumableHours, multipartId, env.partBytes],
+    );
+    return json({
+      uploadId: id, multipart: { partSize: env.partBytes, parts: Math.ceil(size / env.partBytes) },
+      maxBytes: env.maxDemoBytes, expiresAt: row!.expires_at,
+    }, { status: 201 });
+  }
   const target = await getStorage().createUploadTarget(key, size, env.maxDemoBytes, "application/octet-stream");
   const row = await q1<{ expires_at: string }>(
     `insert into uploads(id, owner_id, object_key, filename, declared_size, max_bytes, expires_at)

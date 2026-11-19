@@ -24,8 +24,16 @@ export interface ObjectStream {
   total: number;
 }
 
+export interface UploadedPart { partNumber: number; size: number; etag: string }
+
 export interface Storage {
   createUploadTarget(key: string, size: number, maxBytes: number, contentType: string): Promise<UploadTarget>;
+  /** Multipart (resumable) uploads: start, sign one part, list finished parts, stitch, abort. */
+  startMultipart(key: string, contentType: string): Promise<string>;
+  partTarget(key: string, uploadId: string, partNumber: number, size: number): Promise<UploadTarget>;
+  listParts(key: string, uploadId: string): Promise<UploadedPart[]>;
+  completeMultipart(key: string, uploadId: string, parts: UploadedPart[]): Promise<void>;
+  abortMultipart(key: string, uploadId: string): Promise<void>;
   size(key: string): Promise<number | null>;
   readHead(key: string, n: number): Promise<Buffer>;
   read(key: string): Promise<Buffer>;
@@ -49,6 +57,11 @@ export function verifyFsUpload(key: string, size: number, exp: number, sig: stri
   return exp * 1000 > Date.now() && safeEqual(sig, signFsUpload(key, size, exp));
 }
 
+/** Part uploads sign the part's own object key (key.parts/<uploadId>/<n>). */
+export function fsPartKey(key: string, uploadId: string, partNumber: number) {
+  return `${key}.parts/${uploadId}/${String(partNumber).padStart(5, "0")}`;
+}
+
 class FsStorage implements Storage {
   root = path.resolve(env.storageFsRoot);
   p(key: string) {
@@ -59,6 +72,48 @@ class FsStorage implements Storage {
     const exp = Math.floor(Date.now() / 1000) + env.uploadSlotSeconds;
     const qs = new URLSearchParams({ key, size: String(size), exp: String(exp), sig: signFsUpload(key, size, exp) });
     return { method: "PUT", url: `/api/storage/upload?${qs}`, headers: { "Content-Type": "application/octet-stream" } };
+  }
+  async startMultipart() {
+    return `mp${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  }
+  async partTarget(key: string, uploadId: string, partNumber: number, size: number): Promise<UploadTarget> {
+    return this.createUploadTarget(fsPartKey(key, uploadId, partNumber), size);
+  }
+  async listParts(key: string, uploadId: string) {
+    const { readdir } = await import("node:fs/promises");
+    const dir = this.p(`${key}.parts/${uploadId}`);
+    let names: string[] = [];
+    try { names = await readdir(dir); } catch { return []; }
+    const out: UploadedPart[] = [];
+    for (const n of names) {
+      if (!/^\d{5}$/.test(n)) continue;
+      const s = await stat(path.join(dir, n));
+      out.push({ partNumber: Number(n), size: s.size, etag: `fs-${n}` });
+    }
+    return out.sort((a, b) => a.partNumber - b.partNumber);
+  }
+  async completeMultipart(key: string, uploadId: string, parts: UploadedPart[]) {
+    const file = this.p(key);
+    await mkdir(path.dirname(file), { recursive: true });
+    const tmp = `${file}.part`;
+    const out = createWriteStream(tmp);
+    try {
+      for (const p of parts) {
+        for await (const chunk of createReadStream(this.p(fsPartKey(key, uploadId, p.partNumber)))) {
+          if (!out.write(chunk)) await new Promise((r) => out.once("drain", r));
+        }
+      }
+      await new Promise<void>((res, rej) => out.end((e?: Error | null) => (e ? rej(e) : res())));
+      await rename(tmp, file);
+    } catch (e) {
+      out.destroy();
+      await rm(tmp, { force: true });
+      throw e;
+    }
+    await this.abortMultipart(key, uploadId);
+  }
+  async abortMultipart(key: string, uploadId: string) {
+    await rm(this.p(`${key}.parts/${uploadId}`), { recursive: true, force: true });
   }
   async writeStream(key: string, body: ReadableStream<Uint8Array>, exactSize: number) {
     const file = this.p(key);
@@ -146,6 +201,45 @@ class S3Storage implements Storage {
       signableHeaders: new Set(["content-length", "content-type"]),
     });
     return { method: "PUT", url, headers: { "Content-Type": contentType } };
+  }
+  async startMultipart(key: string, contentType: string) {
+    assertSafeKey(key);
+    const { CreateMultipartUploadCommand } = await import("@aws-sdk/client-s3");
+    const r = await (await this.clientPromise).send(new CreateMultipartUploadCommand({ Bucket: env.s3Bucket, Key: key, ContentType: contentType }));
+    return r.UploadId!;
+  }
+  async partTarget(key: string, uploadId: string, partNumber: number, size: number): Promise<UploadTarget> {
+    assertSafeKey(key);
+    const { UploadPartCommand } = await import("@aws-sdk/client-s3");
+    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+    const cmd = new UploadPartCommand({ Bucket: env.s3Bucket, Key: key, UploadId: uploadId, PartNumber: partNumber, ContentLength: size });
+    const url = await getSignedUrl(await this.publicClientPromise, cmd, { expiresIn: env.uploadSlotSeconds, signableHeaders: new Set(["content-length"]) });
+    return { method: "PUT", url, headers: {} };
+  }
+  async listParts(key: string, uploadId: string) {
+    const { ListPartsCommand } = await import("@aws-sdk/client-s3");
+    const out: UploadedPart[] = [];
+    let marker: string | undefined;
+    for (;;) {
+      const r = await (await this.clientPromise).send(new ListPartsCommand({ Bucket: env.s3Bucket, Key: key, UploadId: uploadId, PartNumberMarker: marker }));
+      for (const p of r.Parts ?? []) out.push({ partNumber: p.PartNumber!, size: p.Size ?? 0, etag: p.ETag ?? "" });
+      if (!r.IsTruncated) break;
+      marker = r.NextPartNumberMarker;
+    }
+    return out.sort((a, b) => a.partNumber - b.partNumber);
+  }
+  async completeMultipart(key: string, uploadId: string, parts: UploadedPart[]) {
+    const { CompleteMultipartUploadCommand } = await import("@aws-sdk/client-s3");
+    await (await this.clientPromise).send(new CompleteMultipartUploadCommand({
+      Bucket: env.s3Bucket, Key: key, UploadId: uploadId,
+      MultipartUpload: { Parts: parts.map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })) },
+    }));
+  }
+  async abortMultipart(key: string, uploadId: string) {
+    const { AbortMultipartUploadCommand } = await import("@aws-sdk/client-s3");
+    try {
+      await (await this.clientPromise).send(new AbortMultipartUploadCommand({ Bucket: env.s3Bucket, Key: key, UploadId: uploadId }));
+    } catch { /* already gone */ }
   }
   async size(key: string) {
     const { HeadObjectCommand } = await import("@aws-sdk/client-s3");
