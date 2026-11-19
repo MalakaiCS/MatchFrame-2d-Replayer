@@ -33,17 +33,34 @@ export function Timeline({
   const markers = events.filter((e) => e.tick >= from && (e.type === "kill" || e.type === "bomb_plant" || e.type === "bomb_defuse" || e.type === "bomb_explode"));
   const shownBookmarks = bookmarks.filter((b) => b.tick >= from);
 
+  const secs = span * manifest.tickIntervalMs / 1000;
+  const grid: number[] = [];
+  for (let sec = 10; sec < secs; sec += 10) grid.push((sec / secs) * 100);
+  const bw = bombWindow(events, round);
+
   return (
     <div className="timeline">
-      {bombWindow(events, round) ? (() => {
-        const [a0, b] = bombWindow(events, round)!;
-        const a = Math.max(a0, from);
-        return (
-          <div className="timeline-bomb" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }} aria-hidden="true">
-            <span>Bomb</span>
-          </div>
-        );
-      })() : null}
+      <div className="timeline-track" aria-hidden="true">
+        {grid.map((g) => <span key={g} className="timeline-grid" style={{ left: `${g}%` }} />)}
+        <span className="timeline-played" style={{ width: pct(Math.max(from, tick)) }} />
+        {bw ? (() => {
+          const a = Math.max(bw[0], from);
+          return (
+            <div className="timeline-bomb" style={{ left: pct(a), width: `calc(${pct(bw[1])} - ${pct(a)})` }}>
+              <span>Bomb</span>
+            </div>
+          );
+        })() : null}
+        <span className="timeline-head" style={{ left: pct(Math.max(from, tick)) }} />
+      </div>
+      <label className="sr-only" htmlFor="round-scrubber">Round timeline</label>
+      <input id="round-scrubber" type="range" min={from} max={round.endTick - 1} step={1} value={Math.round(tick)}
+        aria-valuetext={`${elapsed(tick)} into round ${round.displayNumber}`}
+        onChange={(e) => onSeek(Number(e.target.value))}
+        onKeyDown={(e) => {
+          // Let global shortcuts own arrows/space; the slider still supports Home/End/PageUp/PageDown.
+          if (["ArrowLeft", "ArrowRight", " ", "ArrowUp", "ArrowDown"].includes(e.key)) e.preventDefault();
+        }} />
       <div className="timeline-markers">
         {round.freezeEndTick !== null && round.freezeEndTick > from ? (
           <button type="button" className="tmark" data-kind="freeze" style={{ left: pct(round.freezeEndTick) }}
@@ -65,14 +82,6 @@ export function Timeline({
             aria-label={`Bookmark: ${b.title}`} title={`Bookmark · ${b.title}`} onClick={() => onSeek(b.tick)} />
         ))}
       </div>
-      <label className="sr-only" htmlFor="round-scrubber">Round timeline</label>
-      <input id="round-scrubber" type="range" min={from} max={round.endTick - 1} step={1} value={Math.round(tick)}
-        aria-valuetext={`${elapsed(tick)} into round ${round.displayNumber}`}
-        onChange={(e) => onSeek(Number(e.target.value))}
-        onKeyDown={(e) => {
-          // Let global shortcuts own arrows/space; the slider still supports Home/End/PageUp/PageDown.
-          if (["ArrowLeft", "ArrowRight", " ", "ArrowUp", "ArrowDown"].includes(e.key)) e.preventDefault();
-        }} />
     </div>
   );
 }

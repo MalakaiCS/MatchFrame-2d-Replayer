@@ -112,7 +112,7 @@ export function setposCommand(x: number, y: number, z: number) {
   return `setpos ${x.toFixed(3)} ${y.toFixed(3)} ${z.toFixed(3)}`;
 }
 
-function SetposCopy({ x, y, z }: { x: number; y: number; z: number }) {
+export function SetposCopy({ x, y, z }: { x: number; y: number; z: number }) {
   const [done, setDone] = useState(false);
   const cmd = setposCommand(x, y, z);
   return (

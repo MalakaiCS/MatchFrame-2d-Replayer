@@ -20,7 +20,8 @@ import {
 import { StatusBadge } from "../Library";
 import { CommsPanel } from "./CommsPanel";
 import { KillModifiers, WeaponIcon } from "./GameIcons";
-import { EventsPanel, PlayersPanel, PlaylistPanel, ReviewPanel, useReview } from "./panels";
+import { EventsPanel, PlaylistPanel, ReviewPanel, useReview } from "./panels";
+import { TeamScoreboard } from "./Scoreboard";
 import { reasonText, RoundStrip } from "./RoundStrip";
 import { ShareDialog, ShortcutsDialog } from "./ShareDialog";
 import { Timeline } from "./Timeline";
@@ -40,7 +41,7 @@ interface ReplayResponse {
   series: { id: string; mapIndex: number | null; mapId: string | null; status: string; scoreA: number | null; scoreB: number | null }[];
 }
 
-type DockTab = "players" | "events" | "notes" | "bookmarks" | "playlists" | "comms";
+type DockTab = "events" | "notes" | "bookmarks" | "playlists" | "comms";
 
 function isTextInput(el: EventTarget | null) {
   if (!(el instanceof HTMLElement)) return false;
@@ -138,7 +139,10 @@ function Workspace({
   // Freeze time is skipped by default and left off the timeline.
   const [skipFreeze, setSkipFreeze] = useState(true);
   const [toggles, setToggles] = useState({ names: true, trails: true, utility: true, deaths: true });
-  const [dockTab, setDockTab] = useState<DockTab>("players");
+  const [dockTab, setDockTab] = useState<DockTab>("events");
+  // The review drawer (events, notes, bookmarks, playlists, comms) sits beside the scoreboards; closed by default.
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [mutedRadar, setMutedRadar] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [kbdOpen, setKbdOpen] = useState(false);
   const [composeSignal, setComposeSignal] = useState(0);
@@ -165,8 +169,8 @@ function Workspace({
   const wrapRef = useRef<HTMLDivElement>(null);
   const radarImgs = useRef<Map<number, HTMLImageElement | null>>(new Map());
   const syncs = useRef<Map<string, AudioSync>>(new Map());
-  const optsRef = useRef({ selected, follow, floor, toggles, autoplay, skipFreeze, visibleRounds });
-  optsRef.current = { selected, follow, floor, toggles, autoplay, skipFreeze, visibleRounds };
+  const optsRef = useRef({ selected, follow, floor, toggles, autoplay, skipFreeze, visibleRounds, mutedRadar });
+  optsRef.current = { selected, follow, floor, toggles, autoplay, skipFreeze, visibleRounds, mutedRadar };
   roundRef.current = round;
   playingRef.current = playing;
   speedRef.current = speed;
@@ -333,8 +337,8 @@ function Workspace({
         case "+": case "=": zoom(1.25); break;
         case "-": case "_": zoom(0.8); break;
         case "0": resetView(); break;
-        case "b": case "B": if (canReview) { setDockTab("bookmarks"); setComposeSignal((n) => n + 1); } break;
-        case "n": case "N": if (canReview) { setDockTab("notes"); setComposeSignal((n) => n + 1); } break;
+        case "b": case "B": if (canReview) { setReviewOpen(true); setDockTab("bookmarks"); setComposeSignal((n) => n + 1); } break;
+        case "n": case "N": if (canReview) { setReviewOpen(true); setDockTab("notes"); setComposeSignal((n) => n + 1); } break;
         case "d": case "D": setTool((t) => (t === "draw" ? "pan" : "draw")); break;
         case "?": setKbdOpen(true); break;
         default: handled = false;
@@ -396,7 +400,7 @@ function Workspace({
         const common = {
           map, viewport: viewport.current, width: w, height: h, dpr, frame, players: playersRef.current, selected: o.selected,
           showNames: o.toggles.names, showTrails: o.toggles.trails, showUtility: o.toggles.utility, showDeaths: o.toggles.deaths,
-          strokes: strokes.current.get(r.id),
+          strokes: strokes.current.get(r.id), mutedRadar: o.mutedRadar,
         };
         if (o.floor === "split") {
           const floors = map.floors.map((_, i) => i);
@@ -420,7 +424,7 @@ function Workspace({
   const playersRef = useRef(players);
   playersRef.current = players;
   const lastFrame = useRef<Frame | null>(null);
-  useEffect(() => { dirty.current = true; }, [players, selected, follow, floor, toggles, index]);
+  useEffect(() => { dirty.current = true; }, [players, selected, follow, floor, toggles, index, mutedRadar, reviewOpen]);
 
   // redraw on resize
   useEffect(() => {
@@ -532,7 +536,6 @@ function Workspace({
   const playlistNav = usePlaylistNav(params, id, goRound);
 
   const dockTabs: { id: DockTab; label: string; show: boolean }[] = [
-    { id: "players", label: "Players", show: true },
     { id: "events", label: "Events", show: true },
     { id: "notes", label: `Notes${review.notes.length ? ` (${review.notes.length})` : ""}`, show: canReview },
     { id: "bookmarks", label: `Bookmarks${review.bookmarks.length ? ` (${review.bookmarks.length})` : ""}`, show: canReview },
@@ -541,8 +544,15 @@ function Workspace({
   ];
 
   const T = manifest.teams;
+  const clockEl = (
+    <span className="tclock" data-phase={clock.phase} aria-live="off" title={clock.label}>
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M8 9V6.2M6.5 1.8h3M12.2 4.2l1-1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+      <span className="tclock-time mono">{clock.text}</span>
+      <span className="sr-only">{clock.label}</span>
+    </span>
+  );
   return (
-    <div className="ws">
+    <div className="ws ws-edge">
       <header className="ws-header">
         <Link href="/replays" className="btn btn-ghost btn-sm" aria-label="Back to library">‹ Back</Link>
         <span className="ws-map">{mapName(manifest.map.id)}</span>
@@ -570,129 +580,137 @@ function Workspace({
         {manifest.parser.synthetic ? <span className="badge badge-warn">Synthetic fixture</span> : null}
         {viaShare ? <span className="badge">Read-only link</span> : null}
         <span className="faint" style={{ fontSize: 12 }}>Final {manifest.finalScore.A}–{manifest.finalScore.B}</span>
+        <button type="button" className="btn btn-sm" aria-pressed={reviewOpen} aria-expanded={reviewOpen} aria-controls="review-drawer"
+          onClick={() => setReviewOpen((v) => !v)}>Review{review.notes.length + review.bookmarks.length ? ` (${review.notes.length + review.bookmarks.length})` : ""}</button>
         <button type="button" className="btn btn-ghost icon-btn" onClick={() => setKbdOpen(true)} aria-label="Keyboard shortcuts"><IconKeyboard /></button>
-        <button type="button" className="btn" onClick={() => { setPlaying(false); setShareOpen(true); }}><IconShare /> Share</button>
+        <button type="button" className="btn btn-sm" onClick={() => { setPlaying(false); setShareOpen(true); }}><IconShare /> Share</button>
       </header>
 
       {playlistNav.bar}
 
-      <div className="ws-body">
+      <div className="ws-body" data-review={reviewOpen}>
         <div className="ws-stage">
           <div className="radar-wrap" ref={wrapRef}>
             <canvas ref={canvasRef} role="img"
               aria-label={`Radar of ${mapName(manifest.map.id)}, round ${round.displayNumber}, ${clock.label} ${clock.text}`}
-              onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={resetView} />
-            <div className="radar-overlay">
-              <div className="clock" data-phase={clock.phase} aria-live="off">
-                <span className="clock-time">{clock.text}</span>
-                <span className="clock-label">{clock.label}</span>
-              </div>
-              <div className="view-tools" role="toolbar" aria-label="View controls">
-                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(1.25)} aria-label="Zoom in"><IconZoomIn /></button>
-                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(0.8)} aria-label="Zoom out"><IconZoomOut /></button>
-                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={resetView} aria-label="Reset view"><IconFit /></button>
-                <span className="tool-sep" aria-hidden="true" />
-                <button type="button" className="btn btn-ghost icon-btn btn-sm" aria-pressed={tool === "pan"} onClick={() => setTool("pan")} aria-label="Pan and select tool" title="Pan / select">✋</button>
-                <button type="button" className="btn btn-ghost icon-btn btn-sm" aria-pressed={tool === "draw"} onClick={() => setTool("draw")} aria-label="Draw tool (D)" title="Draw (D)"><IconEdit /></button>
-                {tool === "draw" ? (
-                  <select className="select btn-sm" style={{ height: 26 }} aria-label="Pen colour" value={penColor} onChange={(e) => setPenColor(e.target.value)}>
-                    {PEN_COLORS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
-                ) : null}
-                <button type="button" className="btn btn-ghost icon-btn btn-sm" disabled={!strokeCount || !(strokes.current.get(round.id)?.length)}
-                  onClick={() => { strokes.current.delete(round.id); setStrokeCount((n) => n + 1); dirty.current = true; }}
-                  aria-label="Clear drawings on this round" title="Clear drawings"><IconClose /></button>
-                {map.floors.length > 1 ? (
-                  <select className="select btn-sm" style={{ height: 26 }} aria-label="Floor" value={String(floor)}
-                    onChange={(e) => setFloor(e.target.value === "split" || e.target.value === "auto" ? e.target.value : Number(e.target.value))}>
-                    <option value="split">Both floors side by side</option>
-                    <option value="auto">Floors overlaid</option>
-                    {map.floors.map((f, i) => <option key={f.id} value={i}>{f.label} floor</option>)}
-                  </select>
-                ) : null}
-                <details style={{ position: "relative" }}>
-                  <summary className="btn btn-ghost icon-btn btn-sm" aria-label="Layers"><IconLayers /></summary>
-                  <div className="card" style={{ position: "absolute", right: 0, top: 30, zIndex: 5, width: 200 }}>
-                    {([["names", "Player names"], ["trails", "Grenade paths"], ["utility", "Utility"], ["deaths", "Death markers"]] as const).map(([k, l]) => (
-                      <label key={k} className="row" style={{ fontSize: 13, padding: "2px 0" }}>
-                        <input type="checkbox" checked={toggles[k]} onChange={(e) => setToggles({ ...toggles, [k]: e.target.checked })} /> {l}
-                      </label>
-                    ))}
-                  </div>
-                </details>
-              </div>
-            </div>
+              onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={resetView}
+              data-tool={tool} />
             {payload ? <KillFeed events={payload.events} tick={uiTick} windowTicks={Math.round(6 * manifest.tickRate)} players={players} /> : null}
+            <div className="view-tools" role="toolbar" aria-label="View controls">
+              <details className="tool-pop">
+                <summary className="btn btn-ghost icon-btn btn-sm" aria-label="Display settings" title="Display settings"><IconLayers /></summary>
+                <div className="tool-menu card">
+                  {([["names", "Player names"], ["trails", "Grenade paths"], ["utility", "Utility"], ["deaths", "Death markers"]] as const).map(([k, l]) => (
+                    <label key={k} className="row"><input type="checkbox" checked={toggles[k]} onChange={(e) => setToggles({ ...toggles, [k]: e.target.checked })} /> {l}</label>
+                  ))}
+                  <label className="row"><input type="checkbox" checked={mutedRadar} onChange={(e) => setMutedRadar(e.target.checked)} /> Muted radar</label>
+                  <hr />
+                  <label className="row"><input type="checkbox" checked={skipFreeze} onChange={(e) => setSkipFreeze(e.target.checked)} /> Skip freeze time</label>
+                  <label className="row"><input type="checkbox" checked={autoplay} onChange={(e) => setAutoplay(e.target.checked)} /> Autoplay next round</label>
+                </div>
+              </details>
+              <button type="button" className="btn btn-ghost icon-btn btn-sm" aria-pressed={tool === "pan"} onClick={() => setTool("pan")} aria-label="Pan and select tool" title="Pan / select">✋</button>
+              <button type="button" className="btn btn-ghost icon-btn btn-sm" aria-pressed={tool === "draw"} onClick={() => setTool("draw")} aria-label="Draw tool (D)" title="Draw (D)"><IconEdit /></button>
+              {tool === "draw" ? (
+                <select className="select btn-sm" style={{ height: 26 }} aria-label="Pen colour" value={penColor} onChange={(e) => setPenColor(e.target.value)}>
+                  {PEN_COLORS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+              ) : null}
+              <button type="button" className="btn btn-ghost icon-btn btn-sm" disabled={!strokeCount || !(strokes.current.get(round.id)?.length)}
+                onClick={() => { strokes.current.delete(round.id); setStrokeCount((n) => n + 1); dirty.current = true; }}
+                aria-label="Clear drawings on this round" title="Clear drawings"><IconClose /></button>
+              <span className="tool-sep" aria-hidden="true" />
+              <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(1.25)} aria-label="Zoom in"><IconZoomIn /></button>
+              <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(0.8)} aria-label="Zoom out"><IconZoomOut /></button>
+              <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={resetView} aria-label="Reset view"><IconFit /></button>
+              <button type="button" className="btn btn-ghost btn-sm" aria-pressed={follow} disabled={!selected} onClick={() => setFollow(!follow)}
+                title={selected ? "Keep the selected player centred" : "Select a player to follow"}>Follow</button>
+              {map.floors.length > 1 ? (
+                <select className="select btn-sm" style={{ height: 26 }} aria-label="Floor" value={String(floor)}
+                  onChange={(e) => setFloor(e.target.value === "split" || e.target.value === "auto" ? e.target.value : Number(e.target.value))}>
+                  <option value="split">Both floors side by side</option>
+                  <option value="auto">Floors overlaid</option>
+                  {map.floors.map((f, i) => <option key={f.id} value={i}>{f.label} floor</option>)}
+                </select>
+              ) : null}
+            </div>
             {!index && !roundError ? <div className="radar-note" role="status">Loading round {round.displayNumber}…</div> : null}
             {roundError ? <div className="radar-note alert-err" role="alert">{roundError} <button className="btn btn-sm" onClick={() => setRetry((n) => n + 1)}>Retry</button></div> : null}
             {index && !radarImgs.current.get(0) ? (
               <div className="radar-note">Radar image not installed: positions drawn on a {manifest.map.calibration === "calibrated-unverified" ? "calibrated (unverified)" : "provisional"} 512-unit grid.</div>
             ) : null}
-            {notice ? <div className="radar-note" style={{ bottom: 40 }} role="status">{notice} <button className="btn btn-ghost btn-sm" onClick={() => setNotice(null)}>Dismiss</button></div> : null}
-          </div>
-
-          <div className="transport">
-            <Timeline manifest={manifest} round={round} tick={uiTick} events={payload?.events ?? []} players={players} bookmarks={roundBookmarks} onSeek={seek}
-              fromTick={timelineFrom} />
-            <div className="transport-row" role="toolbar" aria-label="Playback controls">
-              <button type="button" className="btn btn-ghost icon-btn" onClick={() => stepRound(-1)} aria-label="Previous round"><IconPrevRound /></button>
-              <button type="button" className="btn btn-ghost icon-btn" onClick={() => jumpEvent(-1)} aria-label="Previous event"><IconPrevEvent /></button>
-              <button type="button" className="btn btn-ghost icon-btn" onClick={() => seek(tickRef.current - SEEK_SECONDS * manifest.tickRate)} aria-label={`Back ${SEEK_SECONDS} seconds`}><IconBack /></button>
-              <button type="button" className="btn btn-primary icon-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"} disabled={!index}>
-                {playing ? <IconPause /> : <IconPlay />}
-              </button>
-              <button type="button" className="btn btn-ghost icon-btn" onClick={() => seek(tickRef.current + SEEK_SECONDS * manifest.tickRate)} aria-label={`Forward ${SEEK_SECONDS} seconds`}><IconForward /></button>
-              <button type="button" className="btn btn-ghost icon-btn" onClick={() => jumpEvent(1)} aria-label="Next event"><IconNextEvent /></button>
-              <button type="button" className="btn btn-ghost icon-btn" onClick={() => stepRound(1)} aria-label="Next round"><IconNextRound /></button>
-              <label className="sr-only" htmlFor="speed">Playback speed</label>
-              <select id="speed" className="select speed-select" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
-                {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
-              </select>
-              <span className="mono muted" style={{ fontSize: 12, marginLeft: 6 }} aria-label="Elapsed in round">
-                {Math.floor(shownMs / 60000)}:{String(Math.floor((shownMs % 60000) / 1000)).padStart(2, "0")} {skipFreeze ? "into round" : "elapsed"} · tick {Math.round(uiTick)}
-              </span>
-              <span className="grow" />
-              <label className="row" style={{ fontSize: 13 }}><input type="checkbox" checked={skipFreeze} onChange={(e) => setSkipFreeze(e.target.checked)} /> Skip freeze time</label>
-              <label className="row" style={{ fontSize: 13 }}><input type="checkbox" checked={autoplay} onChange={(e) => setAutoplay(e.target.checked)} /> Autoplay next round</label>
-            </div>
+            {notice ? <div className="radar-note" role="status">{notice} <button className="btn btn-ghost btn-sm" onClick={() => setNotice(null)}>Dismiss</button></div> : null}
           </div>
 
           <RoundStrip manifest={manifest} visible={visibleRounds} current={round.id} onSelect={(rid) => goRound(rid)} filters={filters} setFilters={setFilters} />
+
+          <div className="transport">
+            <div className="transport-row" role="toolbar" aria-label="Playback controls">
+              <div className="play-group">
+                <button type="button" className="btn btn-primary icon-btn play-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"} disabled={!index}>
+                  {playing ? <IconPause /> : <IconPlay />}
+                </button>
+                <label className="sr-only" htmlFor="speed">Playback speed</label>
+                <select id="speed" className="speed-badge" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
+                  {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
+                </select>
+              </div>
+              {clockEl}
+              <Timeline manifest={manifest} round={round} tick={uiTick} events={payload?.events ?? []} players={players} bookmarks={roundBookmarks} onSeek={seek}
+                fromTick={timelineFrom} />
+              <span className="mono muted elapsed" aria-label="Elapsed in round" title={`tick ${Math.round(uiTick)}`}>
+                {Math.floor(shownMs / 60000)}:{String(Math.floor((shownMs % 60000) / 1000)).padStart(2, "0")}
+              </span>
+              <div className="step-group">
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => stepRound(-1)} aria-label="Previous round" title="Previous round ([)"><IconPrevRound /></button>
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => jumpEvent(-1)} aria-label="Previous event" title="Previous event (J)"><IconPrevEvent /></button>
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => seek(tickRef.current - SEEK_SECONDS * manifest.tickRate)} aria-label={`Back ${SEEK_SECONDS} seconds`}><IconBack /></button>
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => seek(tickRef.current + SEEK_SECONDS * manifest.tickRate)} aria-label={`Forward ${SEEK_SECONDS} seconds`}><IconForward /></button>
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => jumpEvent(1)} aria-label="Next event" title="Next event (L)"><IconNextEvent /></button>
+                <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => stepRound(1)} aria-label="Next round" title="Next round (])"><IconNextRound /></button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <aside className="dock" aria-label="Replay details">
-          <div className="dock-tabs" role="tablist">
-            {dockTabs.filter((t) => t.show).map((t) => (
-              <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-controls={`panel-${t.id}`} aria-selected={dockTab === t.id} onClick={() => setDockTab(t.id)}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <div className="dock-panel" role="tabpanel" id={`panel-${dockTab}`} aria-labelledby={`tab-${dockTab}`}>
-            {dockTab === "players" ? (
-              <PlayersPanel manifest={manifest} round={round} frame={frameNow} players={players} inventory={inventory}
-                selected={selected} follow={follow} onSelect={setSelected} onFollow={setFollow} />
-            ) : null}
-            {dockTab === "events" ? <EventsPanel manifest={manifest} round={round} events={(payload?.events ?? []).filter((e) => e.tick >= timelineFrom)} tick={uiTick} players={players} onSeek={seek} /> : null}
-            {dockTab === "bookmarks" && canReview ? (
-              <ReviewPanel kind="bookmark" manifest={manifest} replayId={id} round={round} tick={uiTick} items={review.bookmarks}
-                teams={reviewTeams} canReview={canReview} reload={review.reload} onOpen={goRound} composeSignal={composeSignal} />
-            ) : null}
-            {dockTab === "notes" && canReview ? (
-              <ReviewPanel kind="note" manifest={manifest} replayId={id} round={round} tick={uiTick} items={review.notes}
-                teams={reviewTeams} canReview={canReview} reload={review.reload} onOpen={goRound} composeSignal={composeSignal} />
-            ) : null}
-            {dockTab === "playlists" && canReview ? <PlaylistPanel replayId={id} round={round} tick={uiTick} manifest={manifest} canReview={canReview} /> : null}
-            <div hidden={dockTab !== "comms"}>
-              <CommsPanel replayId={id} tickIntervalMs={manifest.tickIntervalMs} tick={uiTick} teams={teams} viaShare={viaShare} registerSync={registerSync} />
+        <aside className="scoreboards" aria-label="Scoreboards">
+          {(["A", "B"] as const).map((k) => (
+            <TeamScoreboard key={k} manifest={manifest} round={round} team={k} frame={frameNow} players={players} inventory={inventory}
+              selected={selected} onSelect={setSelected} />
+          ))}
+        </aside>
+
+        {/* Kept mounted while closed so comms audio stays in sync. */}
+        <aside className="dock" id="review-drawer" aria-label="Review" hidden={!reviewOpen}>
+            <div className="dock-tabs" role="tablist">
+              {dockTabs.filter((t) => t.show).map((t) => (
+                <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-controls={`panel-${t.id}`} aria-selected={dockTab === t.id} onClick={() => setDockTab(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+              <button type="button" className="dock-close" aria-label="Close review" onClick={() => setReviewOpen(false)}><IconClose width={14} height={14} /></button>
             </div>
-            {manifest.warnings.length && dockTab === "events" ? (
-              <details style={{ marginTop: 12 }}>
-                <summary className="faint" style={{ fontSize: 12 }}>Data notes ({manifest.warnings.length})</summary>
-                <ul className="faint" style={{ fontSize: 12 }}>{manifest.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
-              </details>
-            ) : null}
-          </div>
+            <div className="dock-panel" role="tabpanel" id={`panel-${dockTab}`} aria-labelledby={`tab-${dockTab}`}>
+              {dockTab === "events" ? <EventsPanel manifest={manifest} round={round} events={(payload?.events ?? []).filter((e) => e.tick >= timelineFrom)} tick={uiTick} players={players} onSeek={seek} /> : null}
+              {dockTab === "bookmarks" && canReview ? (
+                <ReviewPanel kind="bookmark" manifest={manifest} replayId={id} round={round} tick={uiTick} items={review.bookmarks}
+                  teams={reviewTeams} canReview={canReview} reload={review.reload} onOpen={goRound} composeSignal={composeSignal} />
+              ) : null}
+              {dockTab === "notes" && canReview ? (
+                <ReviewPanel kind="note" manifest={manifest} replayId={id} round={round} tick={uiTick} items={review.notes}
+                  teams={reviewTeams} canReview={canReview} reload={review.reload} onOpen={goRound} composeSignal={composeSignal} />
+              ) : null}
+              {dockTab === "playlists" && canReview ? <PlaylistPanel replayId={id} round={round} tick={uiTick} manifest={manifest} canReview={canReview} /> : null}
+              <div hidden={dockTab !== "comms"}>
+                <CommsPanel replayId={id} tickIntervalMs={manifest.tickIntervalMs} tick={uiTick} teams={teams} viaShare={viaShare} registerSync={registerSync} />
+              </div>
+              {manifest.warnings.length && dockTab === "events" ? (
+                <details style={{ marginTop: 12 }}>
+                  <summary className="faint" style={{ fontSize: 12 }}>Data notes ({manifest.warnings.length})</summary>
+                  <ul className="faint" style={{ fontSize: 12 }}>{manifest.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+                </details>
+              ) : null}
+            </div>
         </aside>
       </div>
 

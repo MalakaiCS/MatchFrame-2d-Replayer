@@ -5,7 +5,7 @@
  *
  * Side markers pair colour with shape: CT = circle, T = triangle. Off-floor
  * players are drawn hollow with an up/down glyph. Estimated smoke and fire
- * areas are drawn with a dashed outline and labelled "est." at high zoom.
+ * areas are drawn as soft clouds and labelled "est." at high zoom.
  */
 import type { PlayerInfo, Side } from "@/shared/contract";
 import { imageToScreen, type MapDef, type Viewport, worldToImage, yawToCanvas, fitScale } from "./maps";
@@ -41,6 +41,8 @@ export interface DrawOptions {
   hideOffFloor?: boolean;
   /** Caption drawn at the top of the panel (e.g. "Upper", "Lower"). */
   panelLabel?: string;
+  /** Draw the radar image desaturated and darker so markers stand out. */
+  mutedRadar?: boolean;
 }
 
 export interface SplitOptions extends Omit<DrawOptions, "floor" | "radar" | "offsetX" | "hideOffFloor" | "panelLabel"> {
@@ -110,7 +112,9 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
   const size = map.imageSize * s;
   if (o.radar && o.radar.complete && o.radar.naturalWidth) {
     ctx.imageSmoothingQuality = "high";
+    if (o.mutedRadar) ctx.filter = "grayscale(0.85) brightness(0.7)";
     ctx.drawImage(o.radar, x0, y0, size, size);
+    ctx.filter = "none";
   } else {
     ctx.fillStyle = "#121a23";
     ctx.fillRect(x0, y0, size, size);
@@ -149,14 +153,12 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
           ctx.moveTo(dx + units(d.radius), dy);
           ctx.arc(dx, dy, units(d.radius), 0, Math.PI * 2, true);
         }
-        ctx.fillStyle = COLORS.smoke;
+        const sg = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r);
+        sg.addColorStop(0, "rgba(214, 222, 230, 0.78)");
+        sg.addColorStop(0.75, "rgba(190, 200, 210, 0.62)");
+        sg.addColorStop(1, "rgba(170, 182, 194, 0.18)");
+        ctx.fillStyle = sg;
         ctx.fill("evenodd");
-        ctx.setLineDash([4, 3]);
-        ctx.strokeStyle = COLORS.smokeEdge;
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
         for (const d of ef.disruptions) {
           const [dx, dy] = toScreen(d.position.x, d.position.y);
           ctx.strokeStyle = "rgba(255,255,255,0.55)";
@@ -171,13 +173,12 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
         const r = units(e.radius);
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fillStyle = COLORS.fire;
+        const fg = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
+        fg.addColorStop(0, "rgba(255, 196, 92, 0.75)");
+        fg.addColorStop(0.6, "rgba(255, 110, 60, 0.55)");
+        fg.addColorStop(1, "rgba(255, 70, 70, 0.12)");
+        ctx.fillStyle = fg;
         ctx.fill();
-        ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = COLORS.fireEdge;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-        ctx.setLineDash([]);
         if (v.zoom >= 2) label(ctx, cx, cy + r + 10, "fire (est.)", 10);
       } else {
         const p = ef.progress ?? 0;
@@ -326,7 +327,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
       ctx.stroke();
     }
     if (off) label(ctx, px, py - r - 8, map.floors.length > 1 && p.floor > (o.floor as number) ? "↓" : "↑", 11);
-    if (o.showNames) label(ctx, px, py + r + 11, info.name, 11);
+    if (o.showNames) nameTag(ctx, px, py + r + 12, info.name, col, p.id === o.selected);
     ctx.globalAlpha = 1;
   }
 
@@ -366,6 +367,23 @@ function label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string
   ctx.strokeText(text, x, y);
   ctx.fillStyle = COLORS.text;
   ctx.fillText(text, x, y);
+}
+
+/** Boxed player name under the marker: dark box, side-coloured top edge. */
+function nameTag(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, side: string, selected: boolean) {
+  ctx.font = "700 10.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const tw = ctx.measureText(text).width;
+  const bw = tw + 8;
+  const bh = 14;
+  roundRect(ctx, x - bw / 2, y - bh / 2, bw, bh, 2);
+  ctx.fillStyle = selected ? "rgba(243, 246, 250, 0.95)" : "rgba(8, 12, 17, 0.82)";
+  ctx.fill();
+  ctx.fillStyle = side;
+  ctx.fillRect(x - bw / 2, y - bh / 2, bw, 1.5);
+  ctx.fillStyle = selected ? "#0b1016" : COLORS.text;
+  ctx.fillText(text, x, y + 0.5);
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

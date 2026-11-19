@@ -60,6 +60,7 @@ test("viewer: kill click lands on the recorded tick; keyboard and filters", asyn
   const marker = page.locator('.tmark[data-kind^="kill"]').first();
   const label = await marker.getAttribute("aria-label");
   await marker.click();
+  await page.getByRole("button", { name: /^Review/ }).click();
   await page.getByRole("tab", { name: "Events" }).click();
   const killRow = page.locator(".event-row[aria-label*=\"killed\"]").first();
   await expect(killRow).toBeVisible();
@@ -97,6 +98,7 @@ test("viewer: kill click lands on the recorded tick; keyboard and filters", asyn
   await expect(page.locator(".review-item", { hasText: "Space ] should type" })).toBeVisible();
 
   // Filters: pistol rounds keep actual round numbers; focus stays on the chip.
+  await page.getByRole("button", { name: /^Filters/ }).click();
   const pistol = page.getByRole("button", { name: "Pistol", exact: true });
   await pistol.click();
   await expect(pistol).toBeFocused();
@@ -105,6 +107,7 @@ test("viewer: kill click lands on the recorded tick; keyboard and filters", asyn
   await expect(page.getByRole("button", { name: /^Round 13 \(pistol\)/ })).toBeVisible();
   await page.getByRole("button", { name: /^Round 13/ }).click();
   await expect(page.locator(".ws-score")).toHaveText(/\d+ : \d+/);
+  await expect(page.locator(".sb")).toHaveCount(2);
   await page.screenshot({ path: path.join(OUT, "viewer-round13.png") });
 
   writeFileSync(path.join(OUT, "perf.json"), JSON.stringify({
