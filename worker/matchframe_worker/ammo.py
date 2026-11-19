@@ -30,24 +30,32 @@ def has_ammo(weapon: str | None) -> bool:
 
 
 def load_ammo(path: str, ticks: list[int]) -> pl.DataFrame | None:
-    """Return a frame (tick, steamid, clip, reserve) or None when unavailable."""
+    """Return a frame (tick, steamid, clip, place) or None when unavailable.
+
+    `place` is the map's own callout for where the player is (CS2's `last_place_name`, e.g.
+    "Apartments", "BombsiteB"); it is read in the same pass because it is cheap.
+    """
     try:
         from demoparser2 import DemoParser
     except ImportError:
         return None
     try:
-        df = DemoParser(path).parse_ticks(["active_weapon_ammo"], ticks=ticks)
+        df = DemoParser(path).parse_ticks(["active_weapon_ammo", "last_place_name"], ticks=ticks)
     except Exception as e:  # noqa: BLE001 - optional enrichment
         log.warning("ammo extraction failed: %s", e)
         return None
     if df is None or len(df) == 0:
         return None
-    out = pl.from_pandas(df[["tick", "steamid", "active_weapon_ammo"]])
-    return out.select(
+    have_place = "last_place_name" in df.columns
+    out = pl.from_pandas(df[["tick", "steamid", "active_weapon_ammo"] + (["last_place_name"] if have_place else [])])
+    cols = [
         pl.col("tick").cast(pl.Int64),
         pl.col("steamid").cast(pl.UInt64, strict=False).cast(pl.Utf8).alias("steamid"),
         pl.col("active_weapon_ammo").cast(pl.Int64, strict=False).alias("clip"),
-    ).unique(subset=["tick", "steamid"], keep="first")
+    ]
+    if have_place:
+        cols.append(pl.col("last_place_name").cast(pl.Utf8).alias("place"))
+    return out.select(cols).unique(subset=["tick", "steamid"], keep="first")
 
 
 def load_recorded_reserve(path: str, sample_ticks: list[int]) -> pl.DataFrame | None:

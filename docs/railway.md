@@ -148,10 +148,16 @@ choosing the same file again after a dropped connection continues with the missi
   aborts incomplete multipart uploads after 2 days, if your provider supports it.
 - Tunables: `UPLOAD_MULTIPART_MIN_BYTES`, `UPLOAD_PART_BYTES` (at least 5 MiB), `RESUMABLE_UPLOAD_HOURS`.
 
+## Anti-strat callouts
+
+Defaults and per-player area reports use CS2 callouts, recorded by worker 0.3.0 and later. Demos
+processed earlier still work with approximate places; re-process them (replay → Share → Re-process)
+to get exact callouts.
+
 ## Anti-strat AI brief (optional)
 
-The pattern finder (`/antistrat`) needs nothing extra. The "Write a game plan with AI" button
-appears only when `ANTHROPIC_API_KEY` is set on the web service.
+The pattern finder (`/antistrat`) needs nothing extra. The "Write a game plan with AI" button and the
+per-player "AI sheet" buttons appear only when `ANTHROPIC_API_KEY` is set on the web service.
 
 - What is sent: the computed patterns for the team (shares, counts, spot labels, player names,
   rule-based counters). Demo files and positions are not sent.

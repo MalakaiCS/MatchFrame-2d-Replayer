@@ -28,13 +28,13 @@ export interface Pattern {
   examples: Example[];
 }
 
-const SITE_RADIUS = 900;
+export const SITE_RADIUS = 900;
 const ZONE = 420;
 
 const pct = (n: number, of: number) => (of ? Math.round((100 * n) / of) : 0);
 const confidence = (share: number, of: number): Pattern["confidence"] =>
   of >= 8 && share >= 0.7 ? "strong" : of >= 5 && share >= 0.5 ? "moderate" : "weak";
-const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+export const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 
 /** Bomb site centres from plant positions in these demos (both teams' plants). */
 export function siteCentres(demos: TeamDemo[]): Record<string, { x: number; y: number; z: number }> {
@@ -54,7 +54,7 @@ export function siteCentres(demos: TeamDemo[]): Record<string, { x: number; y: n
 /** "on A site", "near B", "between the sites", "away from the sites". */
 export const at = (label: string) => (label.endsWith(" site") ? `on ${label}` : label === "between sites" ? "between the sites" : label);
 
-function labeller(sites: Record<string, { x: number; y: number }>) {
+export function labeller(sites: Record<string, { x: number; y: number }>) {
   return (x: number, y: number) => {
     let best: [string, number] | null = null;
     for (const [k, c] of Object.entries(sites)) {
@@ -110,7 +110,7 @@ function positionsAt(ins: Insights, secs: number) {
   return out;
 }
 
-const ex = (d: TeamDemo, ri: number, secs = 0): Example => {
+export const ex = (d: TeamDemo, ri: number, secs = 0): Example => {
   const r = d.ins.rounds[ri];
   return { replayId: d.replayId, roundId: r.id, roundNumber: r.n, ms: Math.max(0, Math.round((r.freeze - r.startTick) * d.ins.tickMs + secs * 1000)) };
 };

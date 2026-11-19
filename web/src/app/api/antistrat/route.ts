@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/access";
 import { aiEnabled } from "@/lib/antistratAi";
 import { badRequest, json, route } from "@/lib/http";
+import { Callouts, calloutList, findDefaults } from "@/lib/areas";
 import { findPatterns } from "@/lib/patterns";
 import { idsParam, loadTeamDemos } from "@/lib/teamDemos";
 
@@ -17,5 +18,9 @@ export const GET = route(async (req: Request) => {
   const map = (u.searchParams.get("map") ?? "").trim();
   if (!name || !map) throw badRequest("Give a team name and a map.");
   const { demos, list, pending } = await loadTeamDemos(user, u, name, map, idsParam(u));
-  return json({ team: name, map, list, pending, ai: aiEnabled(), report: findPatterns(demos) });
+  const co = new Callouts(demos);
+  return json({
+    team: name, map, list, pending, ai: aiEnabled(), report: findPatterns(demos),
+    defaults: findDefaults(demos, co), callouts: calloutList(co),
+  });
 });

@@ -661,8 +661,31 @@ describe("pattern finder and anti-strat", () => {
     expect((await owner.req("/api/antistrat?map=de_mirage")).status).toBe(400);
     expect((await outsider.req(`/api/antistrat?${qs}`)).status).toBe(404);
     expect((await anon.req(`/api/antistrat?${qs}`)).status).toBe(401);
+    expect(auto.defaults.T.rounds + auto.defaults.CT.rounds).toBeGreaterThan(0);
+    expect(Array.isArray(auto.defaults.T.players)).toBe(true);
+    // Player reports: your roster (team B of the same demo here) with areas, then a report per player.
+    const roster = await owner.json(`/api/antistrat/roster?name=${encodeURIComponent(`Prey ${run}`)}&map=de_mirage`, {}, 200);
+    expect(roster.demos).toBe(1);
+    expect(roster.players.length).toBeGreaterThan(0);
+    const p0 = roster.players[0];
+    expect(p0.CT.area.length + p0.T.area.length).toBeGreaterThan(0);
+    const reports = await owner.json("/api/antistrat/reports", { method: "POST", json: {
+      opponent: `Scout ${run}`, map: "de_mirage",
+      players: [{ name: p0.name, role: { CT: p0.CT.role }, CT: p0.CT.area, T: p0.T.area }],
+    } }, 200);
+    expect(reports.reports).toHaveLength(1);
+    const rep = reports.reports[0].CT ?? reports.reports[0].T;
+    expect(rep.rounds).toBeGreaterThan(0);
+    expect(rep.sections.length).toBeGreaterThan(0);
+    // A team with no demos on the map gets an empty roster to fill in by hand.
+    expect((await owner.json(`/api/antistrat/roster?name=nobody-${run}&map=de_mirage`, {}, 200)).players).toEqual([]);
+    expect((await owner.req("/api/antistrat/reports", { method: "POST", json: { opponent: `Scout ${run}`, map: "de_mirage", players: [] } })).status).toBe(400);
+    expect((await outsider.req("/api/antistrat/reports", { method: "POST", json: { opponent: `Scout ${run}`, map: "de_mirage", players: [{ name: "x", CT: ["A site"], T: [] }] } })).status).toBe(404);
     // The AI brief is off unless the server has an API key.
-    if (!auto.ai) expect((await owner.req("/api/antistrat/ai", { method: "POST", json: { name: `Scout ${run}`, map: "de_mirage" } })).status).toBe(503);
+    if (!auto.ai) {
+      expect((await owner.req("/api/antistrat/ai", { method: "POST", json: { name: `Scout ${run}`, map: "de_mirage" } })).status).toBe(503);
+      expect((await owner.req("/api/antistrat/ai/player", { method: "POST", json: { opponent: `Scout ${run}`, map: "de_mirage", players: [{ name: "x", CT: ["A site"], T: [] }] } })).status).toBe(503);
+    }
     await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: null, teamBName: null } }, 200);
   });
 });

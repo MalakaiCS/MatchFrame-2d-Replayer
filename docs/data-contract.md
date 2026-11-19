@@ -59,6 +59,12 @@ Versions recorded per replay: schema version, parser name and version, worker ve
   - demoparser2's `m_pReserveAmmo` / `total_ammo_left` values are wrong for some weapons and are not used.
 - `-1` means not applicable (melee, grenades, bomb) or unknown. The viewer shows `clip/reserve` (or just `clip`) next to the active weapon.
 
+## Callouts (worker 0.3.0+)
+
+- `track.place[i]` is an index into `payload.places` (CS2's own place names, e.g. `Apartments`, `BombsiteB`, `TopofMid`), or `-1` when unknown. It is CS2's `last_place_name`, read with demoparser2 in the same pass as the clip, at the sample ticks.
+- Both fields are absent on replays processed before 0.3.0; re-process them to get callouts. The anti-strat tools then fall back to coarse labels (`A site`, `near B`, `between sites`).
+- Insights (version 4) carry them as `pos.c` (index into `insights.places`). Spots without a sample (grenade landings, kills, plants) get the majority callout of nearby samples on the same level (`lib/areas.ts`, `Callouts.locate`).
+
 ## Partial and damaged recordings
 
 - **Recording starts mid-match** (e.g. a GOTV restart): display numbers use the match's own round numbers (`r07`, "Round 7"), so pistol and overtime detection stay correct. The score before the first recorded round comes from the in-game scoreboard (`team_rounds_total`, via demoparser2). `capabilities.recordingStartsAtRound` records where the recording begins.

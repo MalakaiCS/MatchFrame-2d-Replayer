@@ -17,7 +17,7 @@ import { getStorage } from "./storage";
 
 export const POS_STEP_S = 2;
 /** Bump when the shape changes; older cached insights are rebuilt. */
-export const INSIGHTS_VERSION = 3;
+export const INSIGHTS_VERSION = 4;
 
 /** Weapon groups for the kill/death filters. */
 export const WEAPON_GROUPS: Record<string, string[]> = {
@@ -43,8 +43,11 @@ export interface Insights {
     /** Seconds from freeze end until the round was decided. */
     length: number; endReason: string | null;
   }[];
-  /** Columnar: round index, player index, seconds since freeze end, x, y, z (rounded). */
-  pos: { r: number[]; p: number[]; s: number[]; x: number[]; y: number[]; z: number[] };
+  /** Columnar: round index, player index, seconds since freeze end, x, y, z (rounded), and the map
+   *  callout (index into `places`, -1 unknown; absent for replays processed before callouts were recorded). */
+  pos: { r: number[]; p: number[]; s: number[]; x: number[]; y: number[]; z: number[]; c?: number[] };
+  /** CS2 callouts (place names) used by pos.c. */
+  places?: string[];
   kills: { r: number; s: number; k: number; v: number; kx: number | null; ky: number | null; kz: number | null; vx: number; vy: number; vz: number; w: string | null; hs: boolean }[];
   nades: { r: number; s: number; p: number; type: GrenadeType; ox: number; oy: number; oz: number; lx: number; ly: number; lz: number; tick: number }[];
 }
@@ -63,7 +66,8 @@ export function buildInsights(m: Manifest, payloads: Map<string, RoundPayload>):
       plant: null, defused: false, exploded: false,
       length: Math.max(0, Math.round(((r.decidedTick ?? r.endTick) - (r.freezeEndTick ?? r.startTick)) * tickS)), endReason: r.endReason,
     })),
-    pos: { r: [], p: [], s: [], x: [], y: [], z: [] },
+    pos: { r: [], p: [], s: [], x: [], y: [], z: [], c: [] },
+    places: [],
     kills: [],
     nades: [],
   };
@@ -73,6 +77,12 @@ export function buildInsights(m: Manifest, payloads: Map<string, RoundPayload>):
     const from = round.freezeEndTick ?? round.startTick;
     const to = round.decidedTick ?? round.endTick;
     const step = Math.max(1, Math.round(POS_STEP_S / tickS));
+    // Payload place indices -> insights place indices.
+    const placeMap = (pl.places ?? []).map((name) => {
+      let i = out.places!.indexOf(name);
+      if (i < 0) { i = out.places!.length; out.places!.push(name); }
+      return i;
+    });
     for (const tr of pl.tracks) {
       const pi = pIdx.get(tr.playerId);
       if (pi === undefined) continue;
@@ -85,6 +95,8 @@ export function buildInsights(m: Manifest, payloads: Map<string, RoundPayload>):
         if (!tr.alive[i]) continue;
         out.pos.r.push(ri); out.pos.p.push(pi); out.pos.s.push(Math.round((t - from) * tickS));
         out.pos.x.push(r0(tr.x[i])); out.pos.y.push(r0(tr.y[i])); out.pos.z.push(r0(tr.z[i]));
+        const c = tr.place?.[i] ?? -1;
+        out.pos.c!.push(c >= 0 && c < placeMap.length ? placeMap[c] : -1);
       }
     }
     for (const e of pl.events) {

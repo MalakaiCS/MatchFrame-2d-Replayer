@@ -174,6 +174,8 @@ export interface PlayerTrack {
    */
   clip?: number[] | null;
   reserve?: number[] | null;
+  /** Map callout per sample (index into RoundPayload.places, -1 unknown). Absent on older replays. */
+  place?: number[] | null;
   /** Bit flags: 1 bomb, 2 defuser, 4 helmet, 8 defusing, 16 planting, 32 scoped, 64 blinded. */
   flags: number[];
   /** Floor index into the map registry floors. */
@@ -280,6 +282,8 @@ export interface RoundPayload {
   endTick: number;
   sampleEveryTicks: number;
   weapons: string[];
+  /** CS2 place names (callouts) used by track.place, e.g. "Apartments", "BombsiteB". Absent on older replays. */
+  places?: string[];
   tracks: PlayerTrack[];
   events: GameEvent[];
   bomb: BombTransition[];

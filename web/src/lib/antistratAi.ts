@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { HttpError } from "./http";
+import type { AreaReport, Defaults } from "./areas";
 import type { PatternReport } from "./patterns";
 
 export const aiEnabled = () => !!process.env.ANTHROPIC_API_KEY;
@@ -40,6 +41,11 @@ export async function writeBrief(team: string, map: string, report: PatternRepor
       spot: p.spot?.label ?? null,
     })),
   };
+  return call(SYSTEM, `Opponent patterns (JSON):\n${JSON.stringify(facts)}\n\nWrite the anti-strat brief.`, Brief);
+}
+
+async function call<S extends z.ZodType>(system: string, content: string, schema: S): Promise<z.infer<S>> {
+  client ??= new Anthropic();
   try {
     const res = await client.beta.messages.parse({
       model: MODEL,
@@ -47,9 +53,9 @@ export async function writeBrief(team: string, map: string, report: PatternRepor
       // A declined request is re-run on a fallback model in the same call.
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      output_config: { effort: "medium", format: betaZodOutputFormat(Brief) },
-      system: SYSTEM,
-      messages: [{ role: "user", content: `Opponent patterns (JSON):\n${JSON.stringify(facts)}\n\nWrite the anti-strat brief.` }],
+      output_config: { effort: "medium", format: betaZodOutputFormat(schema) },
+      system,
+      messages: [{ role: "user", content }],
     });
     if (res.stop_reason === "refusal") throw new HttpError(422, "AI_REFUSED", "The AI could not write a brief for this data.");
     if (res.stop_reason === "max_tokens" || !res.parsed_output) throw new HttpError(502, "AI_INCOMPLETE", "The AI brief came back incomplete. Try again.");
@@ -67,4 +73,37 @@ export async function writeBrief(team: string, map: string, report: PatternRepor
     }
     throw e;
   }
+}
+
+export const PlayerBrief = z.object({
+  summary: z.string().describe("Two or three sentences: what this player should expect in their area against this team."),
+  ctSide: z.array(z.string()).describe("How to play the area on CT against their T side: setups, timings, utility, when to fall back or rotate."),
+  tSide: z.array(z.string()).describe("How to attack the area on T against their CT side: who holds it, where, how to take it."),
+  watchFor: z.array(z.string()).describe("Specific opponent players, timings and utility to watch for."),
+  caveats: z.array(z.string()).describe("Where the sample is small or the data is ambiguous."),
+});
+export type PlayerBriefT = z.infer<typeof PlayerBrief>;
+
+const PLAYER_SYSTEM = `You are a Counter-Strike 2 coach writing a personal anti-strat sheet for ONE player on our team,
+about the area of the map they play. You get the measured behaviour of the opponent in that area (from the
+opponent's demos), as counts and shares, plus the opponent's default setups.
+- Use only the numbers given; do not invent positions, callouts, utility or players.
+- Talk to the player directly ("you"). Each item is one or two sentences they can act on in a round.
+- Say when a sample is small (under 5 rounds).`;
+
+const slim = (r: AreaReport | null) => r && { headline: r.headline, rounds: r.rounds, sections: r.sections, tips: r.tips };
+
+export async function writePlayerBrief(opponent: string, map: string, player: { name: string; role: { CT?: string; T?: string } },
+  ct: AreaReport | null, t: AreaReport | null, defaults: Defaults): Promise<PlayerBriefT> {
+  client ??= new Anthropic();
+  const facts = {
+    opponent, map, player: player.name, role: player.role,
+    ourArea: { CT: ct?.area ?? [], T: t?.area ?? [] },
+    asCT: slim(ct), asT: slim(t),
+    opponentDefaults: {
+      T: { notes: defaults.T.notes, players: defaults.T.players.map((p) => ({ name: p.name, role: p.role, at: p.checkpoints })) },
+      CT: { notes: defaults.CT.notes, players: defaults.CT.players.map((p) => ({ name: p.name, role: p.role, at: p.checkpoints })) },
+    },
+  };
+  return call(PLAYER_SYSTEM, `Data (JSON):\n${JSON.stringify(facts)}\n\nWrite ${player.name}'s anti-strat sheet.`, PlayerBrief);
 }

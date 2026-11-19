@@ -74,6 +74,10 @@ def test_real_demo(name):
     # Ammo: clips recorded for guns.
     assert m["capabilities"]["ammo"] is True
     assert any(c > 0 for p in res.payloads.values() for t in p["tracks"] if t["clip"] for c in t["clip"])
+    # Map callouts per sample (CS2 place names).
+    names = {n for p in res.payloads.values() for n in p["places"]}
+    assert {"BombsiteA", "BombsiteB"} <= names or len(names) >= 5
+    assert any(i >= 0 for p in res.payloads.values() for t in p["tracks"] if t["place"] for i in t["place"])
 
 
 def test_overtime_flags():

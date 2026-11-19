@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getMapDef, type MapDef, mapName, worldToImage } from "@/viewer/maps";
 import { api, ApiError } from "./api";
 import { InsightsPanel } from "./Insights";
+import { PlayerReports, prettyPlace } from "./PlayerReports";
 import { SpacePicker, useSpace } from "./StatsHub";
 
 interface TeamItem { key: string; name: string; demos: number; maps: string[] }
@@ -23,8 +24,13 @@ interface Pattern {
   spot?: { x: number; y: number; z: number; label: string }; examples: Example[];
 }
 interface Demo { id: string; title: string | null; when: string; opponent: string; side: "A" | "B"; score: string; won: boolean | null; ready: boolean }
+interface DefaultsSide {
+  rounds: number; notes: string[]; spread: { c: string; avg: number }[];
+  players: { key: string; name: string; role: string; checkpoints: { s: number; top: { c: string; share: number }[] }[] }[];
+}
 interface Resp {
-  team: string; map: string; list: Demo[]; pending: number; ai: boolean;
+  team: string; map: string; list: Demo[]; pending: number; ai: boolean; callouts: string[];
+  defaults: { T: DefaultsSide; CT: DefaultsSide; callouts: boolean };
   report: { demos: number; rounds: { T: number; CT: number }; sites: string[]; players: { key: string; name: string }[]; patterns: Pattern[] };
 }
 interface Brief { summary: string; tSide: string[]; ctSide: string[]; players: { name: string; notes: string }[]; gamePlan: string[]; caveats: string[] }
@@ -44,9 +50,10 @@ export function AntiStrat() {
   const qsKey = qs.toString();
   const name = params.get("name") ?? "";
   const map = params.get("map") ?? "";
-  const mode = params.get("mode") === "manual" ? "manual" : "auto";
+  const mode = params.get("mode") === "manual" ? "manual" : params.get("mode") === "players" ? "players" : "auto";
   const [teams, setTeams] = useState<TeamItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aiOn, setAiOn] = useState(false);
 
   const set = useCallback((patch: Record<string, string>) => {
     const p = new URLSearchParams(params.toString());
@@ -67,6 +74,11 @@ export function AntiStrat() {
     load();
     return () => { stop = true; };
   }, [qsKey, router]);
+
+  useEffect(() => {
+    if (!name || !map) return;
+    api<{ ai: boolean }>(`/api/antistrat?${new URLSearchParams({ name, map })}&${qsKey}`).then((r) => setAiOn(r.ai)).catch(() => {});
+  }, [name, map, qsKey]);
 
   const team = teams?.find((t) => t.name.toLowerCase() === name.toLowerCase()) ?? null;
   // Default to the team's first map.
@@ -97,6 +109,7 @@ export function AntiStrat() {
         <div className="ins-group" role="tablist" aria-label="Mode">
           <button type="button" role="tab" className="chip" aria-selected={mode === "auto"} aria-pressed={mode === "auto"} onClick={() => set({ mode: "" })}>Automatic</button>
           <button type="button" role="tab" className="chip" aria-selected={mode === "manual"} aria-pressed={mode === "manual"} onClick={() => set({ mode: "manual" })}>Manual</button>
+          <button type="button" role="tab" className="chip" aria-selected={mode === "players"} aria-pressed={mode === "players"} onClick={() => set({ mode: "players" })}>Player reports</button>
         </div>
       </div>
       {error ? <p className="alert alert-err" role="alert">{error}</p> : null}
@@ -112,7 +125,9 @@ export function AntiStrat() {
         </div>
       ) : null}
       {team && map ? (
-        mode === "auto"
+        mode === "players"
+          ? <PlayerReports key={`${team.name}|${map}|${qsKey}`} opponent={team.name} map={map} teams={teams ?? []} qsKey={qsKey} space={space} teamId={teamId} ai={aiOn} />
+          : mode === "auto"
           ? <AutoMode key={`${team.name}|${map}|${qsKey}`} name={team.name} map={map} qsKey={qsKey} space={space} teamId={teamId} />
           : <ManualMode key={`${team.name}|${map}|${qsKey}`} name={team.name} map={map} qsKey={qsKey} space={space} teamId={teamId} />
       ) : null}
@@ -234,6 +249,7 @@ function Report({ data, name, map, ids, space, teamId }: { data: Resp; name: str
         <div className="card as-kpi"><strong>{R.rounds.CT}</strong><span className="faint">CT rounds</span></div>
         <div className="card as-kpi"><strong>{R.patterns.length}</strong><span className="faint">patterns · {R.patterns.filter((p) => p.confidence === "strong").length} strong</span></div>
       </div>
+      <DefaultsView d={data.defaults} />
       {data.ai ? <AiBrief name={name} map={map} ids={ids} space={space} teamId={teamId} disabled={!!data.pending || !R.patterns.length} /> : null}
       <div className="ins-controls" style={{ margin: "12px 0" }}>
         <div className="ins-group" role="group" aria-label="Side">
@@ -338,6 +354,51 @@ function AiBrief({ name, map, ids, space, teamId, disabled }: { name: string; ma
           <List title="Caveats" items={brief.caveats} />
           <p className="faint" style={{ fontSize: 11 }}>Written by AI from the patterns on this page. Check it against the example rounds.</p>
         </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** The opponent's default setups: where each player is at set times in gun rounds, and how T rounds unfold. */
+function DefaultsView({ d }: { d: Resp["defaults"] }) {
+  const [side, setSide] = useState<"T" | "CT">("T");
+  const D = d[side];
+  if (!d.T.rounds && !d.CT.rounds) return null;
+  return (
+    <section className="card as-defaults" aria-label="Their defaults">
+      <div className="ins-head">
+        <h2>Their defaults</h2>
+        <div className="ins-group" role="group" aria-label="Defaults side">
+          {(["T", "CT"] as const).map((s) => <button key={s} type="button" className="chip" aria-pressed={side === s} onClick={() => setSide(s)}>{s} side ({d[s].rounds})</button>)}
+        </div>
+      </div>
+      {!d.callouts ? <p className="faint" style={{ fontSize: 12 }}>These demos were processed before callouts were recorded, so places are approximate. Re-process them (Share → Re-process) for exact callouts.</p> : null}
+      {D.notes.length ? <ul className="as-notes">{D.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
+      {D.players.length ? (
+        <div className="ms-table-wrap">
+          <table className="ms-table as-table">
+            <thead><tr><th scope="col">Player</th><th scope="col">Role</th>{D.players[0].checkpoints.map((c) => <th key={c.s} scope="col">At {Math.floor(c.s / 60)}:{String(c.s % 60).padStart(2, "0")}</th>)}</tr></thead>
+            <tbody>
+              {D.players.map((p) => (
+                <tr key={p.key}>
+                  <td><strong>{p.name}</strong></td>
+                  <td>{p.role}</td>
+                  {p.checkpoints.map((c) => (
+                    <td key={c.s}>
+                      {c.top[0] ? <>{prettyPlace(c.top[0].c)} <span className="faint">{Math.round(c.top[0].share * 100)}%</span></> : "—"}
+                      {c.top[1] ? <div className="faint" style={{ fontSize: 11 }}>{prettyPlace(c.top[1].c)} {Math.round(c.top[1].share * 100)}%</div> : null}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <p className="muted">No gun rounds on this side yet.</p>}
+      {D.spread.length ? (
+        <p className="as-ex" style={{ marginTop: 8 }}><span className="faint">Typical spread at {side === "T" ? "0:30" : "0:20"}:</span>{" "}
+          {D.spread.map((s) => <span key={s.c} className="chip">{prettyPlace(s.c)} ×{s.avg}</span>)}
+        </p>
       ) : null}
     </section>
   );

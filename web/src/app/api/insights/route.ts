@@ -56,8 +56,12 @@ export const GET = route(async (req: Request) => {
     // A round link only shows its round.
     if (a.shareRoundId) {
       const keep = ins.rounds.findIndex((r) => r.id === a.shareRoundId);
-      const one = { ...ins, pos: { r: [] as number[], p: [] as number[], s: [] as number[], x: [] as number[], y: [] as number[], z: [] as number[] }, kills: ins.kills.filter((k) => k.r === keep), nades: ins.nades.filter((n) => n.r === keep) };
-      ins.pos.r.forEach((r, i) => { if (r === keep) for (const c of ["r", "p", "s", "x", "y", "z"] as const) one.pos[c].push(ins.pos[c][i]); });
+      const one = { ...ins, pos: { r: [] as number[], p: [] as number[], s: [] as number[], x: [] as number[], y: [] as number[], z: [] as number[], c: [] as number[] }, kills: ins.kills.filter((k) => k.r === keep), nades: ins.nades.filter((n) => n.r === keep) };
+      ins.pos.r.forEach((r, i) => {
+        if (r !== keep) return;
+        for (const c of ["r", "p", "s", "x", "y", "z"] as const) one.pos[c].push(ins.pos[c][i]);
+        one.pos.c.push(ins.pos.c?.[i] ?? -1);
+      });
       selectPoints(one, a.replay.id, team, f, out);
     } else selectPoints(ins, a.replay.id, team, f, out);
     for (const p of ins.players) if (p.team === team) players.set(p.steamId ?? p.id, p.name);

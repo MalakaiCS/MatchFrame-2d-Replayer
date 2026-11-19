@@ -630,6 +630,19 @@ def _round_payload(
             weapons.append(w)
         return widx[w]
 
+    # Map callouts (CS2 place names), indexed like weapons.
+    places: list[str] = []
+    pidx: dict[str, int] = {}
+
+    def pi(p: Any) -> int:
+        if p is None or str(p).strip() == "":
+            return -1
+        p = str(p)
+        if p not in pidx:
+            pidx[p] = len(places)
+            places.append(p)
+        return pidx[p]
+
     expected = max(1, (rd.end - rd.start) // every)
     cols = set(sub.columns)
     tracks = []
@@ -642,7 +655,7 @@ def _round_payload(
         pid = pid[0] if isinstance(pid, tuple) else pid
         rows = g.to_dicts()
         coverage[pid] = round(min(1.0, len(rows) / expected), 3)
-        t, xs, ys, zs, yaws, alive, hp, ar, money, wpn, flags, floor, disc, clip, reserve = ([] for _ in range(15))
+        t, xs, ys, zs, yaws, alive, hp, ar, money, wpn, flags, floor, disc, clip, reserve, place = ([] for _ in range(16))
         prev = None
         prev_inv: tuple | None = None
         for r in rows:
@@ -683,6 +696,7 @@ def _round_payload(
             ar.append(int(r.get("armor") or 0))
             money.append(int(r.get("money") or 0))
             wpn.append(wi(r.get("active_weapon")))
+            place.append(pi(r.get("place")))
             # -1 = not applicable (melee, grenades, bomb) or unknown.
             gun = has_ammo(r.get("active_weapon")) and is_alive
             clip.append(int(r["clip"]) if gun and r.get("clip") is not None and r["clip"] >= 0 else -1)
@@ -713,6 +727,7 @@ def _round_payload(
                 "weapon": wpn if "active_weapon" in cols else None,
                 "clip": clip if "clip" in cols else None,
                 "reserve": reserve if "reserve" in cols else None,
+                "place": place if "place" in cols else None,
                 "flags": flags,
                 "floor": floor,
                 "disc": disc,
@@ -914,6 +929,7 @@ def _round_payload(
         "endTick": rd.end,
         "sampleEveryTicks": every,
         "weapons": weapons,
+        "places": places,
         "tracks": tracks,
         "events": events,
         "bomb": bomb,
