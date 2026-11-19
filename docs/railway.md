@@ -38,6 +38,7 @@
    - Variables:
      - `DATABASE_URL=${{Postgres.DATABASE_URL}}` (the private URL)
      - `APP_ORIGIN=https://2d.matchframe.tv`
+     - Sign-ups are accepted from `APP_ORIGIN`, `https://2d.matchframe.tv`, and Railway's generated domain (picked up automatically from `RAILWAY_PUBLIC_DOMAIN`). Add other addresses with `TRUSTED_ORIGINS` (comma-separated). Any other origin gets "Invalid origin".
      - `AUTH_SECRET=<openssl rand -base64 48>`
      - `STORAGE_DRIVER=s3`
      - `S3_BUCKET`, `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT` (the endpoint browsers can reach), `S3_REGION`
