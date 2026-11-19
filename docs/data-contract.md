@@ -143,3 +143,20 @@ other 4 were within 3 HP (fall damage).
 
 Older replays have no `playerStats`. Re-parsing needs the original demo (`KEEP_SOURCE_AFTER_PARSE=1`
 keeps it; otherwise upload the demo again). `web/scripts/reprocess-all.mjs` queues re-parses in bulk.
+
+## Round tags (web/src/lib/roundTags.ts)
+
+Tags are computed per round from one team's point of view, from the replay's insights:
+
+| Tag | Rule |
+|---|---|
+| Pistol | Pistol round (rounds 1 and 13, and the first round of each half under other formats) |
+| Eco / Half buy / Full buy | The team's buy type for the round (see Economy) |
+| Anti-eco | The team full-bought against an eco |
+| Fast plant / Execute / Late plant / No plant | T side only: planted < 35 s after freeze end, 35–70 s, after 70 s, or not at all |
+| Retake won | CT side won by defusing |
+| Post-plant won | T side planted and won |
+| Save | The team lost and still had 2+ players alive when the round was decided |
+| Opening kill / Opening death | The round's first kill was by / against the team |
+
+Plant times on the search page are seconds after freeze end.

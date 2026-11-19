@@ -17,7 +17,7 @@ import { getStorage } from "./storage";
 
 export const POS_STEP_S = 2;
 /** Bump when the shape changes; older cached insights are rebuilt. */
-export const INSIGHTS_VERSION = 2;
+export const INSIGHTS_VERSION = 3;
 
 /** Weapon groups for the kill/death filters. */
 export const WEAPON_GROUPS: Record<string, string[]> = {
@@ -37,6 +37,11 @@ export interface Insights {
     id: string; n: number; sides: Record<TeamKey, Side>; winner: TeamKey | null; freeze: number; startTick: number;
     /** Pistol round, and each team's buy (pistol / eco / half_buy / full_buy / null). */
     pistol: boolean; buy: Record<TeamKey, string | null>;
+    /** Bomb plant (seconds since freeze end, site) and how it ended; null when not planted. */
+    plant: { s: number; site: string | null; x: number; y: number; z: number } | null;
+    defused: boolean; exploded: boolean;
+    /** Seconds from freeze end until the round was decided. */
+    length: number; endReason: string | null;
   }[];
   /** Columnar: round index, player index, seconds since freeze end, x, y, z (rounded). */
   pos: { r: number[]; p: number[]; s: number[]; x: number[]; y: number[]; z: number[] };
@@ -55,6 +60,8 @@ export function buildInsights(m: Manifest, payloads: Map<string, RoundPayload>):
     rounds: m.rounds.map((r) => ({
       id: r.id, n: r.displayNumber, sides: r.sides, winner: r.winner, freeze: r.freezeEndTick ?? r.startTick, startTick: r.startTick,
       pistol: r.isPistol, buy: { A: normalizeBuyType(r.economy?.A?.buyType), B: normalizeBuyType(r.economy?.B?.buyType) },
+      plant: null, defused: false, exploded: false,
+      length: Math.max(0, Math.round(((r.decidedTick ?? r.endTick) - (r.freezeEndTick ?? r.startTick)) * tickS)), endReason: r.endReason,
     })),
     pos: { r: [], p: [], s: [], x: [], y: [], z: [] },
     kills: [],
@@ -81,6 +88,12 @@ export function buildInsights(m: Manifest, payloads: Map<string, RoundPayload>):
       }
     }
     for (const e of pl.events) {
+      const rd = out.rounds[ri];
+      if (e.type === "bomb_plant" && !rd.plant) {
+        rd.plant = { s: Math.round((e.tick - from) * tickS), site: e.site ?? null, x: r0(e.position?.x ?? 0), y: r0(e.position?.y ?? 0), z: r0(e.position?.z ?? 0) };
+      }
+      if (e.type === "bomb_defuse") rd.defused = true;
+      if (e.type === "bomb_explode") rd.exploded = true;
       if (e.type !== "kill" || !e.position || !e.target) continue;
       const v = pIdx.get(e.target);
       if (v === undefined) continue;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Manifest, RoundPayload } from "@/shared/contract";
-import { buildInsights, type InsightFilter, type NadePoint, type Point, selectPoints } from "@/lib/insights";
+import { buildInsights, type InsightFilter, INSIGHTS_VERSION, type NadePoint, type Point, selectPoints } from "@/lib/insights";
 
 const bag = () => ({ points: [] as Point[], nades: [] as NadePoint[] });
 
@@ -66,7 +66,7 @@ describe("insights", () => {
     const gun = bag();
     selectPoints(ins2, "rep", "A", { ...all, rounds: "gun" }, gun);
     expect(gun.points).toHaveLength(0);
-    expect(ins2.v).toBe(2);
+    expect(ins2.v).toBe(INSIGHTS_VERSION);
   });
 });
 

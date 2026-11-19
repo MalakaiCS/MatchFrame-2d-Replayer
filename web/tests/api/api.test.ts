@@ -513,3 +513,20 @@ describe("moving demos and invite links", () => {
   });
 });
 
+describe("round search", () => {
+  it("finds tagged rounds in your demos and nothing in other people's", async () => {
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: `Seek ${run}`, teamBName: `Hide ${run}` } }, 200);
+    const all = await owner.json(`/api/rounds/search?team=${encodeURIComponent(`Seek ${run}`)}`, {}, 200);
+    expect(all.results.length).toBe(manifest.rounds.length);
+    expect(all.results[0]).toMatchObject({ replayId, team: `Seek ${run}`, opponent: `Hide ${run}` });
+    expect(Array.isArray(all.results[0].tags)).toBe(true);
+    const won = await owner.json(`/api/rounds/search?team=${encodeURIComponent(`Seek ${run}`)}&result=won`, {}, 200);
+    expect(won.results.every((r: any) => r.won)).toBe(true);
+    const pistol = await owner.json(`/api/rounds/search?team=${encodeURIComponent(`Seek ${run}`)}&tags=pistol`, {}, 200);
+    expect(pistol.results.map((r: any) => r.number).sort((a: number, b: number) => a - b)).toEqual([1, 13]);
+    expect((await owner.req("/api/rounds/search?tags=nonsense")).status).toBe(400);
+    expect((await outsider.json(`/api/rounds/search?team=${encodeURIComponent(`Seek ${run}`)}`, {}, 200)).results).toEqual([]);
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: null, teamBName: null } }, 200);
+  });
+});
+

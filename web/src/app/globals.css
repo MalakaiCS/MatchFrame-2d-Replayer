@@ -566,3 +566,11 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
 .bulk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bulk-progress { width: 140px; height: 6px; display: inline-block; }
 .bulk-msg { flex-basis: 100%; color: var(--danger); font-size: 12px; }
+
+/* round search */
+.rs-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.rs-filters .field { margin-bottom: 8px; }
+.rs-filters .field > span, .rs-filters .field > label { color: var(--text-dim); font-size: 13px; }
+.rs-tags { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
+.rs-tagcell { display: flex; gap: 4px; flex-wrap: wrap; font-weight: 400 !important; }
+.rs-table td, .rs-table th { vertical-align: middle; }

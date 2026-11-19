@@ -26,7 +26,7 @@ const rate = (x: WL) => (x.p ? `${Math.round((100 * x.w) / x.p)}%` : "—");
 const frac = (x: WL) => `${x.w}/${x.p}`;
 
 /** Space picker shared by both pages: all demos, personal, or one team library. */
-function useSpace() {
+export function useSpace() {
   const params = useSearchParams();
   const [teams, setTeams] = useState<TeamOption[]>([]);
   useEffect(() => { api<{ teams: TeamOption[] }>("/api/teams").then((r) => setTeams(r.teams)).catch(() => {}); }, []);
@@ -36,7 +36,7 @@ function useSpace() {
   return { teams, space, teamId, qs };
 }
 
-function SpacePicker({ teams, space, teamId, onChange }: { teams: TeamOption[]; space: string; teamId: string; onChange: (space: string, teamId: string) => void }) {
+export function SpacePicker({ teams, space, teamId, onChange }: { teams: TeamOption[]; space: string; teamId: string; onChange: (space: string, teamId: string) => void }) {
   const value = space === "team" ? `team:${teamId}` : space;
   return (
     <label className="row" style={{ fontSize: 13 }}>
@@ -90,6 +90,7 @@ export function StatsHub() {
         <label className="sr-only" htmlFor="team-search">Search teams</label>
         <input id="team-search" className="input" placeholder="Search teams" value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 300 }} />
         <SpacePicker teams={teams} space={space} teamId={teamId} onChange={go} />
+        <Link className="btn" href={`/stats/rounds?${qsKey}`}>Find rounds</Link>
       </div>
       {error ? <p className="alert alert-err" role="alert">{error}</p> : null}
       {data ? (
@@ -151,7 +152,10 @@ export function TeamOverview() {
       <p className="ms-eyebrow"><Link href={`/stats?${qsKey}`}>Stats</Link> · Team overview</p>
       <div className="ms-head">
         <h1 style={{ margin: 0 }}>{d?.name ?? name}</h1>
-        <SpacePicker teams={teams} space={space} teamId={teamId} onChange={(s, id) => router.replace(link({ space: s, teamId: id }))} />
+        <div className="row">
+          <Link className="btn" href={`/stats/rounds?${new URLSearchParams({ team: d?.name ?? name, ...(map ? { map } : {}) })}&${qsKey}`}>Find {d?.name ?? name}&apos;s rounds</Link>
+          <SpacePicker teams={teams} space={space} teamId={teamId} onChange={(s, id) => router.replace(link({ space: s, teamId: id }))} />
+        </div>
       </div>
       {error ? <p className="alert alert-err" role="alert">{error}</p> : null}
       {!d && !error ? <p className="muted">Loading…</p> : null}
