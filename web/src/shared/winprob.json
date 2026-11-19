@@ -1,0 +1,60 @@
+{
+  "model": "logistic-v1",
+  "features": [
+    "bias",
+    "alive_diff",
+    "ct_alive",
+    "t_alive",
+    "hp_diff",
+    "eq_diff",
+    "planted",
+    "bomb_left",
+    "round_left",
+    "planted_x_alive_diff"
+  ],
+  "weights": [
+    0.02831,
+    0.52707,
+    0.23309,
+    -0.29398,
+    0.48976,
+    0.70784,
+    -1.49704,
+    0.97831,
+    0.32957,
+    0.78947
+  ],
+  "trainedOn": {
+    "demos": [
+      "baks-vs-the-last-resort-m1-nuke.dem",
+      "baks-vs-the-last-resort-m2-cache.dem",
+      "bc-game-vs-wbt-dust2.dem",
+      "furia-vs-falcons-m1-ancient.dem",
+      "furia-vs-falcons-m2-dust2.dem",
+      "iberian-soul-vs-hyperspirit-mirage.dem",
+      "iberian-soul-vs-sashi-m1-inferno.dem",
+      "infinite-vs-basement-boys-ancient.dem",
+      "mm1.dem",
+      "mm2.dem",
+      "mm3.dem",
+      "sashi-vs-mouz-nxt-nuke.dem",
+      "saw-vs-astral-m1-cache.dem",
+      "saw-vs-bayankhongor-anubis.dem",
+      "scrim-8pm-inferno.dem"
+    ],
+    "states": 25903
+  },
+  "heldOut": {
+    "demos": [
+      "saw-vs-astral-m1-cache.dem",
+      "saw-vs-bayankhongor-anubis.dem",
+      "scrim-8pm-inferno.dem"
+    ],
+    "states": 4346,
+    "logLoss": 0.4536,
+    "baselineLogLoss": 0.655,
+    "brier": 0.1516,
+    "accuracy": 0.766
+  },
+  "note": "Logistic regression on alive players, health, equipment, bomb and time; CT side's view. Hard rules: no CTs alive -> 0; no Ts alive and no plant -> 1."
+}

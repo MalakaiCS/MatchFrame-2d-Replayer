@@ -281,3 +281,18 @@ describe("movement trails", () => {
     expect(tr.pts.map((p) => p[0])).toEqual([20, 30, 35]);
   });
 });
+
+import { ctWinProbability } from "@/viewer/winprob";
+describe("win probability", () => {
+  const base = { ctAlive: 5, tAlive: 5, ctHp: 500, tHp: 500, ctEq: 20000, tEq: 20000, planted: false, bombLeft: 0, roundLeft: 1 };
+  it("follows the state of the round", () => {
+    const even = ctWinProbability(base);
+    expect(even).toBeGreaterThan(0.3);
+    expect(even).toBeLessThan(0.75);
+    expect(ctWinProbability({ ...base, tAlive: 3, tHp: 300 })).toBeGreaterThan(even);
+    expect(ctWinProbability({ ...base, ctAlive: 2, ctHp: 200 })).toBeLessThan(even);
+    expect(ctWinProbability({ ...base, planted: true, bombLeft: 0.2 })).toBeLessThan(ctWinProbability({ ...base, planted: true, bombLeft: 0.9 }));
+    expect(ctWinProbability({ ...base, ctAlive: 0 })).toBe(0);
+    expect(ctWinProbability({ ...base, tAlive: 0 })).toBe(1);
+  });
+});

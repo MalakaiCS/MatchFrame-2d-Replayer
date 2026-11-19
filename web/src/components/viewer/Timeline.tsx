@@ -13,8 +13,10 @@ export function bombWindow(events: GameEvent[], round: RoundSummary): [number, n
 export interface TimelineBookmark { id: string; tick: number; title: string }
 
 export function Timeline({
-  manifest, round, tick, events, players, bookmarks, onSeek, fromTick,
+  manifest, round, tick, events, players, bookmarks, onSeek, fromTick, winLine,
 }: {
+  /** CT win probability over the round (drawn as a line in the track). */
+  winLine?: { tick: number; p: number }[];
   /** First tick shown (freeze end when freeze time is skipped). */
   fromTick?: number;
   manifest: Manifest;
@@ -51,6 +53,12 @@ export function Timeline({
             </div>
           );
         })() : null}
+        {winLine && winLine.length > 1 ? (
+          <svg className="timeline-wp" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+            <line x1="0" x2="1000" y1="50" y2="50" />
+            <polyline points={winLine.filter((w) => w.tick >= from).map((w) => `${(((w.tick - from) / span) * 1000).toFixed(1)},${((1 - w.p) * 100).toFixed(1)}`).join(" ")} />
+          </svg>
+        ) : null}
         <span className="timeline-head" style={{ left: pct(Math.max(from, tick)) }} />
       </div>
       <label className="sr-only" htmlFor="round-scrubber">Round timeline</label>

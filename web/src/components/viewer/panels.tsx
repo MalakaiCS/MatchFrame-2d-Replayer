@@ -157,11 +157,13 @@ export function describeEvent(e: GameEvent, name: (id?: string | null) => string
 }
 
 export function EventsPanel({
-  manifest, round, events, tick, players, onSeek,
+  manifest, round, events, tick, players, onSeek, swings,
 }: {
   manifest: Manifest;
   round: RoundSummary;
   events: GameEvent[];
+  /** Win-probability swing per kill (percentage points for the killer's side). */
+  swings?: Map<string, number>;
   tick: number;
   players: Map<string, PInfo>;
   onSeek: (t: number) => void;
@@ -187,6 +189,11 @@ export function EventsPanel({
               <WeaponIcon name={e.weapon} height={14} />
               <KillModifiers e={e} />
               <span className={`side side-${players.get(e.target ?? "")?.side ?? "T"}`}>{name(e.target)}</span>
+              {swings?.has(e.id) ? (
+                <span className="wp-swing" title="Change in the killer's side's estimated chance to win the round">
+                  {swings.get(e.id)! >= 0 ? "+" : ""}{swings.get(e.id)!.toFixed(0)}%
+                </span>
+              ) : null}
             </span>
           ) : (
             <span>{describeEvent(e, name)}{e.provenance === "inferred" && e.type !== "smoke_disrupted" ? " (inferred)" : ""}</span>

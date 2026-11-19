@@ -610,3 +610,10 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
 .tb-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border-strong); cursor: pointer; }
 .tb-swatch[aria-pressed="true"] { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
 @media (max-width: 900px) { .tb-layout { grid-template-columns: 1fr; } }
+
+/* win probability */
+.timeline-wp { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.timeline-wp line { stroke: rgba(154, 168, 184, 0.25); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 3 3; }
+.timeline-wp polyline { fill: none; stroke: var(--ct); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: 0.85; }
+.wp-now { font-family: var(--mono); font-size: 12px; font-weight: 700; flex: 0 0 auto; }
+.wp-swing { font-family: var(--mono); font-size: 11px; color: var(--ok); margin-left: 4px; }

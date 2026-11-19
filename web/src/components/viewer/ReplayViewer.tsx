@@ -10,6 +10,7 @@ import { drawFrame, drawSplit, panelWidth, playerAtPoint, type Stroke } from "@/
 import { filterRounds, filtersFromParam, filtersToParam, type RoundFilters } from "@/viewer/filters";
 import { getMapDef, mapName, screenToImage, type Viewport, worldToImage, zoomAt } from "@/viewer/maps";
 import { frameAt, inventoryAt, nextEvent, trailsAt, type Frame, type RoundIndex } from "@/viewer/playback";
+import { killSwing, winTimeline } from "@/viewer/winprob";
 import { RoundCache } from "@/viewer/roundCache";
 import { buildReplayUrl, resolveMoment, shareTokenFromHash } from "@/viewer/shareUrl";
 import { api, ApiError, setShareToken } from "../api";
@@ -606,6 +607,23 @@ function Workspace({
   const roundBookmarks = review.bookmarks.filter((b) => b.roundId === round.id && b.status !== "unavailable").map((b) => ({ id: b.id, tick: b.tick, title: b.title ?? "" }));
   const reviewTeams = teams;
   const playlistNav = usePlaylistNav(params, id, goRound);
+  // Win probability (estimate) for the loaded round, and each kill's swing.
+  const winLine = useMemo(() => (index ? winTimeline(index, round, manifest) : []), [index, round, manifest]);
+  const swings = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!index) return m;
+    for (const e of index.payload.events) {
+      const side = e.type === "kill" && e.actor ? players.get(e.actor)?.side : undefined;
+      if (side && e.target && players.get(e.target)?.side !== side) m.set(e.id, killSwing(index, round, manifest, e.tick, side));
+    }
+    return m;
+  }, [index, round, manifest, players]);
+  const wpNow = (() => {
+    if (!winLine.length) return null;
+    let p = winLine[0].p;
+    for (const w of winLine) { if (w.tick > uiTick) break; p = w.p; }
+    return p;
+  })();
   const roundOnly = viaShare && !!data.access.roundId;
 
   /**
@@ -788,8 +806,13 @@ function Workspace({
                 </select>
               </div>
               {clockEl}
+              {wpNow !== null ? (
+                <span className="wp-now" title="Estimated chance to win the round (model fitted on real demos)">
+                  <span className="sidecol-CT">CT {Math.round(wpNow * 100)}%</span>
+                </span>
+              ) : null}
               <Timeline manifest={manifest} round={round} tick={uiTick} events={payload?.events ?? []} players={players} bookmarks={roundBookmarks} onSeek={seek}
-                fromTick={timelineFrom} />
+                fromTick={timelineFrom} winLine={winLine} />
               <span className="mono muted elapsed" aria-label="Elapsed in round" title={`tick ${Math.round(uiTick)}`}>
                 {Math.floor(shownMs / 60000)}:{String(Math.floor((shownMs % 60000) / 1000)).padStart(2, "0")}
               </span>
@@ -823,7 +846,7 @@ function Workspace({
               <button type="button" className="dock-close" aria-label="Close review" onClick={() => setReviewOpen(false)}><IconClose width={14} height={14} /></button>
             </div>
             <div className="dock-panel" role="tabpanel" id={`panel-${dockTab}`} aria-labelledby={`tab-${dockTab}`}>
-              {dockTab === "events" ? <EventsPanel manifest={manifest} round={round} events={(payload?.events ?? []).filter((e) => e.tick >= timelineFrom)} tick={uiTick} players={players} onSeek={seek} /> : null}
+              {dockTab === "events" ? <EventsPanel manifest={manifest} round={round} events={(payload?.events ?? []).filter((e) => e.tick >= timelineFrom)} tick={uiTick} players={players} onSeek={seek} swings={swings} /> : null}
               {dockTab === "bookmarks" && canReview ? (
                 <ReviewPanel kind="bookmark" manifest={manifest} replayId={id} round={round} tick={uiTick} items={review.bookmarks}
                   teams={reviewTeams} canReview={canReview} reload={review.reload} onOpen={goRound} composeSignal={composeSignal} />
