@@ -19,6 +19,11 @@ export const BoardData = z.object({
     arrow: z.boolean().optional(),
     points: z.array(z.tuple([z.number(), z.number()])).min(2).max(2000),
   })).max(300),
+  /** Animation steps after the base layout: token positions that change in each step. */
+  steps: z.array(z.object({
+    label: z.string().max(60).optional(),
+    pos: z.record(z.string().max(40), z.tuple([z.number(), z.number()])),
+  })).max(20).default([]),
 });
 export type BoardDataT = z.infer<typeof BoardData>;
 

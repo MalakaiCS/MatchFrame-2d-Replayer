@@ -563,8 +563,10 @@ describe("tactic boards", () => {
     const v2 = await owner.json(`/api/tactics/${mine.id}`, { method: "PUT", json: { data, version: b.version } }, 200);
     expect((await owner.req(`/api/tactics/${mine.id}`, { method: "PUT", json: { data, version: b.version } })).status).toBe(409);
     expect((await owner.json(`/api/tactics/${mine.id}`, {}, 200)).data.tokens).toHaveLength(1);
+    const v3 = await owner.json(`/api/tactics/${mine.id}`, { method: "PUT", json: { data: { ...data, steps: [{ label: "Smokes", pos: { x: [150, 220] } }] }, version: v2.version } }, 200);
+    expect((await owner.json(`/api/tactics/${mine.id}`, {}, 200)).data.steps[0]).toEqual({ label: "Smokes", pos: { x: [150, 220] } });
     expect((await owner.req("/api/tactics", { method: "POST", json: { name: "x", mapId: "de_nowhere" } })).status).toBe(400);
-    expect((await owner.req(`/api/tactics/${mine.id}`, { method: "PUT", json: { data: { ...data, tokens: [{ id: "y", kind: "nope", x: 1, y: 1 }] }, version: v2.version } })).status).toBe(400);
+    expect((await owner.req(`/api/tactics/${mine.id}`, { method: "PUT", json: { data: { ...data, tokens: [{ id: "y", kind: "nope", x: 1, y: 1 }] }, version: v3.version } })).status).toBe(400);
 
     const t = await owner.json("/api/teams", { method: "POST", json: { name: `Boards ${run}` } }, 201);
     await owner.json(`/api/teams/${t.id}/members`, { method: "POST", json: { email: mateEmail, role: "viewer" } }, 201);

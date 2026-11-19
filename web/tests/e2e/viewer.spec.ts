@@ -217,6 +217,18 @@ test("clip export, tactic board from a replay moment, and round comparison", asy
   await page.getByRole("button", { name: "Smoke" }).click();
   await page.locator(".tb-canvas").click({ position: { x: 200, y: 200 } });
   await expect(page.getByText("All changes saved")).toBeVisible({ timeout: 10_000 });
+  // Animated steps: add a step, move the smoke, play.
+  await page.getByRole("button", { name: "+ Step" }).click();
+  await page.getByRole("button", { name: "Move", exact: true }).click();
+  const box = (await page.locator(".tb-canvas").boundingBox())!;
+  await page.mouse.move(box.x + 200, box.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 320, box.y + 260, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.getByText("All changes saved")).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "▶ Play" }).click();
+  await expect(page.getByRole("button", { name: "Playing…" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "▶ Play" })).toBeVisible({ timeout: 5_000 });
   await page.screenshot({ path: path.join(OUT, "tactic-board.png") });
 
   // Compare two rounds picked in round search.

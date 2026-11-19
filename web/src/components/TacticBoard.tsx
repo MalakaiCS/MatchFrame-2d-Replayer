@@ -12,7 +12,24 @@ import { api, ApiError } from "./api";
 type Kind = "ct" | "t" | "smoke" | "flash" | "molotov" | "he" | "bomb" | "text";
 interface Token { id: string; kind: Kind; x: number; y: number; label?: string }
 interface Stroke { color: string; width: number; arrow?: boolean; points: [number, number][] }
-interface Data { floor: number; tokens: Token[]; strokes: Stroke[] }
+interface Step { label?: string; pos: Record<string, [number, number]> }
+interface Data { floor: number; tokens: Token[]; strokes: Stroke[]; steps?: Step[] }
+
+/** Where a token is at a (fractional) step: step 0 is the base layout; later steps override positions. */
+export function posAt(d: Data, t: Token, at: number): [number, number] {
+  const at0 = Math.floor(at);
+  const find = (s: number): [number, number] => {
+    for (let i = s; i >= 1; i--) { const p = d.steps?.[i - 1]?.pos[t.id]; if (p) return p; }
+    return [t.x, t.y];
+  };
+  const a = find(at0);
+  const f = at - at0;
+  if (f <= 0 || at0 >= (d.steps?.length ?? 0)) return a;
+  const b = find(at0 + 1);
+  // Ease in-out between steps.
+  const e = f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2;
+  return [a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e];
+}
 interface Board { id: string; name: string; mapId: string; teamId: string | null; data: Data; version: number; mine: boolean }
 
 const COLORS = ["#f3f6fa", "#ff5d73", "#ffd84d", "#7fd18b"];
@@ -37,6 +54,9 @@ export function TacticBoardEditor({ id }: { id: string }) {
   const dataRef = useRef<Data>({ floor: 0, tokens: [], strokes: [] });
   const versionRef = useRef(0);
   const dragRef = useRef<{ token?: Token; stroke?: Stroke } | null>(null);
+  // Current step (0 = base layout) and, while playing, the fractional animation position.
+  const [step, setStep] = useState(0);
+  const [anim, setAnim] = useState<number | null>(null);
   const [, force] = useState(0);
   const redraw = () => force((n) => n + 1);
 
@@ -117,8 +137,9 @@ export function TacticBoardEditor({ id }: { id: string }) {
     for (const kind of order) {
       for (const t of d.tokens.filter((x) => x.kind === kind)) {
         const s = STYLE[t.kind];
-        const x = t.x * k;
-        const y = t.y * k;
+        const [px, py] = posAt(d, t, anim ?? step);
+        const x = px * k;
+        const y = py * k;
         if (t.kind === "text") {
           ctx.font = "700 13px ui-sans-serif, system-ui, sans-serif";
           ctx.textAlign = "center";
@@ -162,7 +183,8 @@ export function TacticBoardEditor({ id }: { id: string }) {
     for (let i = d.tokens.length - 1; i >= 0; i--) {
       const t = d.tokens[i];
       const rr = t.kind === "smoke" ? 144 / map!.scale : t.kind === "molotov" ? 120 / map!.scale : Math.max(STYLE[t.kind].r, 12) / k;
-      if (Math.hypot(t.x - x, t.y - y) <= rr) return t;
+      const [px, py] = posAt(d, t, step);
+      if (Math.hypot(px - x, py - y) <= rr) return t;
     }
     return null;
   };
@@ -204,7 +226,14 @@ export function TacticBoardEditor({ id }: { id: string }) {
     const g = dragRef.current;
     if (!g) return;
     const [x, y] = toImage(e);
-    if (g.token) { g.token.x = x; g.token.y = y; redraw(); }
+    if (g.token) {
+      // In a step, moving a token records its position for that step only.
+      if (step > 0) {
+        const steps = (dataRef.current.steps ??= []);
+        steps[step - 1].pos[g.token.id] = [x, y];
+      } else { g.token.x = x; g.token.y = y; }
+      redraw();
+    }
     if (g.stroke) {
       const last = g.stroke.points[g.stroke.points.length - 1];
       if (Math.hypot(last[0] - x, last[1] - y) > 3) { g.stroke.points.push([x, y]); redraw(); }
@@ -261,8 +290,44 @@ export function TacticBoardEditor({ id }: { id: string }) {
           <button type="button" className="btn btn-sm btn-danger" onClick={() => { if (confirm("Clear everything on this board?")) { dataRef.current.tokens = []; dataRef.current.strokes = []; changed(); } }}>Clear board</button>
           <p className="faint" style={{ fontSize: 12, margin: 0 }}>Pick a token, then click the map to place it. Move drags tokens; Erase removes a token or a line.</p>
         </div>
+        <div className="tb-main">
+        <StepBar
+          steps={dataRef.current.steps ?? []} step={step} playing={anim !== null}
+          onSelect={(s) => { setAnim(null); setStep(s); }}
+          onAdd={() => {
+            const steps = (dataRef.current.steps ??= []);
+            if (steps.length >= 20) return;
+            steps.push({ pos: {} });
+            setStep(steps.length);
+            changed();
+          }}
+          onRemove={() => {
+            const steps = dataRef.current.steps ?? [];
+            if (!step || !steps.length) return;
+            steps.splice(step - 1, 1);
+            setStep(Math.min(step, steps.length));
+            changed();
+          }}
+          onLabel={(label) => {
+            const s = dataRef.current.steps?.[step - 1];
+            if (s) { s.label = label.slice(0, 60) || undefined; changed(); }
+          }}
+          onPlay={() => {
+            const n = dataRef.current.steps?.length ?? 0;
+            if (!n) return;
+            const t0 = performance.now();
+            const tick = (now: number) => {
+              const at = Math.min(n, (now - t0) / 1500);
+              setAnim(at);
+              if (at < n) requestAnimationFrame(tick);
+              else { setAnim(null); setStep(n); }
+            };
+            requestAnimationFrame(tick);
+          }}
+        />
         <canvas ref={canvasRef} className="tb-canvas" role="img" aria-label={`${mapName(board.mapId)} tactic board`} data-tool={tool.type}
           onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} />
+        </div>
       </div>
     </div>
   );
@@ -334,6 +399,37 @@ export function TacticBoardList() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Step bar: base layout, then numbered steps; play animates through them. */
+function StepBar({ steps, step, playing, onSelect, onAdd, onRemove, onLabel, onPlay }: {
+  steps: Step[]; step: number; playing: boolean;
+  onSelect: (s: number) => void; onAdd: () => void; onRemove: () => void; onLabel: (l: string) => void; onPlay: () => void;
+}) {
+  return (
+    <div className="tb-steps" role="toolbar" aria-label="Animation steps">
+      <button type="button" className="btn btn-sm btn-primary" disabled={!steps.length || playing} onClick={onPlay} title="Animate through the steps">
+        {playing ? "Playing…" : "▶ Play"}
+      </button>
+      <div className="ins-group" role="group" aria-label="Steps">
+        <button type="button" className="chip" aria-pressed={step === 0} onClick={() => onSelect(0)}>Start</button>
+        {steps.map((s, i) => (
+          <button key={i} type="button" className="chip" aria-pressed={step === i + 1} onClick={() => onSelect(i + 1)} title={s.label ?? `Step ${i + 1}`}>
+            {s.label ? `${i + 1}. ${s.label}` : `Step ${i + 1}`}
+          </button>
+        ))}
+        <button type="button" className="chip" onClick={onAdd} disabled={steps.length >= 20}>+ Step</button>
+      </div>
+      {step > 0 ? (
+        <>
+          <input className="input btn-sm" style={{ height: 28, maxWidth: 200 }} aria-label="Step label" placeholder="Label, e.g. Smokes land"
+            key={step} defaultValue={steps[step - 1]?.label ?? ""} onBlur={(e) => onLabel(e.target.value.trim())} />
+          <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={onRemove}>Remove step</button>
+          <span className="faint" style={{ fontSize: 12 }}>Drag players to where they are in this step.</span>
+        </>
+      ) : <span className="faint" style={{ fontSize: 12 }}>Set up the start, then add steps and move players in each.</span>}
     </div>
   );
 }

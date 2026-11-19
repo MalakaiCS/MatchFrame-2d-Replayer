@@ -617,3 +617,6 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
 .timeline-wp polyline { fill: none; stroke: var(--ct); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: 0.85; }
 .wp-now { font-family: var(--mono); font-size: 12px; font-weight: 700; flex: 0 0 auto; }
 .wp-swing { font-family: var(--mono); font-size: 11px; color: var(--ok); margin-left: 4px; }
+
+.tb-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tb-steps { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
