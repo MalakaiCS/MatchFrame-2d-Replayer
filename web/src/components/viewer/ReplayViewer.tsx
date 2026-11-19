@@ -89,6 +89,15 @@ export function ReplayViewer({ id }: { id: string }) {
 
   if (loadError) {
     if (loadError.status === 401) return <div className="page"><p className="muted">Redirecting to sign in…</p></div>;
+    if (loadError.status === 402) {
+      return (
+        <div className="page" style={{ maxWidth: 640 }}>
+          <h1>This replay needs a plan</h1>
+          <p className="page-sub">{loadError.message}</p>
+          <div className="row"><Link className="btn btn-primary" href="/billing">See plans</Link><Link className="btn" href="/replays">Go to library</Link></div>
+        </div>
+      );
+    }
     return (
       <div className="page" style={{ maxWidth: 640 }}>
         <h1>{loadError.status === 401 ? "Sign in to view this replay" : "Replay unavailable"}</h1>

@@ -3,6 +3,7 @@
  * Every manifest, payload, review and audio request goes through replayAccess().
  */
 import { getUser, type SessionUser } from "./auth";
+import { assertReplayCovered } from "./billing";
 import { q, q1 } from "./db";
 import { forbidden, notFound, unauthorized } from "./http";
 import { sha256 } from "./ids";
@@ -68,7 +69,17 @@ export async function shareLinkFor(replayId: string, token: string | null) {
   );
 }
 
-export async function replayAccess(req: Request, replayId: string, opts: { user?: SessionUser | null } = {}): Promise<Access> {
+/**
+ * Who may do what with a replay. Signed-in access (owner, team, grant) also needs a plan when
+ * billing is on; pass `planCheck: false` for actions that only remove access or data (delete, revoke).
+ */
+export async function replayAccess(req: Request, replayId: string, opts: { user?: SessionUser | null; planCheck?: boolean } = {}): Promise<Access> {
+  const a = await resolveAccess(req, replayId, opts);
+  if (a.user && a.via !== "share" && a.via !== "catalogue" && opts.planCheck !== false) await assertReplayCovered(a.user.id, a.replay);
+  return a;
+}
+
+async function resolveAccess(req: Request, replayId: string, opts: { user?: SessionUser | null }): Promise<Access> {
   if (!/^[A-Za-z0-9]{8,64}$/.test(replayId)) throw notFound();
   const replay = await q1<ReplayRow>("select * from replays where id = $1 and deleted_at is null", [replayId]);
   const user = opts.user !== undefined ? opts.user : await getUser(req.headers);

@@ -8,6 +8,7 @@ const NAV = [
   { href: "/replays", label: "Library" },
   { href: "/replays/new", label: "Upload" },
   { href: "/teams", label: "Teams" },
+  { href: "/billing", label: "Plans" },
 ];
 
 export function TopBar() {
@@ -27,6 +28,7 @@ export function TopBar() {
           <a href="#features">Features</a>
           <a href="#how">How it works</a>
           <a href="#maps">Maps</a>
+          <a href="#plans">Plans</a>
           <a href="#faq">FAQ</a>
         </nav>
       ) : session ? (

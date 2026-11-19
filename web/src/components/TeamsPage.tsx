@@ -1,9 +1,11 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
 
 interface Team { id: string; name: string; role: string; members: number }
+interface TeamPlan { id: string; plan: { active: boolean; status: string } | null }
 interface Member { id: string; name: string; email: string; role: string }
 
 const ROLES = ["owner", "coach", "analyst", "player", "viewer"] as const;
@@ -22,10 +24,12 @@ export function TeamsPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [myRole, setMyRole] = useState("viewer");
   const [error, setError] = useState<string | null>(null);
+  const [plans, setPlans] = useState<{ enabled: boolean; teams: TeamPlan[] } | null>(null);
 
   const load = useCallback(async () => {
     try {
       setTeams((await api<{ teams: Team[] }>("/api/teams")).teams);
+      api<{ enabled: boolean; teams: TeamPlan[] }>("/api/billing").then(setPlans).catch(() => {});
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) router.push("/login?next=/teams");
     }
@@ -82,7 +86,7 @@ export function TeamsPage() {
   return (
     <div className="page" style={{ maxWidth: 860 }}>
       <h1>Teams</h1>
-      <p className="page-sub">Teams share replays, bookmarks, notes, playlists and voice recordings. Roles control who can review.</p>
+      <p className="page-sub">Teams share replays, bookmarks, notes, playlists and voice recordings. Roles control who can review. With a <Link href="/billing">team plan</Link>, everyone on the team can upload and review.</p>
       <form className="row" onSubmit={create} style={{ marginBottom: 16 }}>
         <label className="sr-only" htmlFor="team-name">New team name</label>
         <input id="team-name" className="input" name="name" placeholder="New team name" required maxLength={80} />
@@ -96,6 +100,12 @@ export function TeamsPage() {
             <div className="row">
               <strong className="grow">{t.name}</strong>
               <span className="badge">{t.role}</span>
+              {plans?.enabled ? (() => {
+                const p = plans.teams.find((x) => x.id === t.id)?.plan;
+                return p?.active
+                  ? <span className="badge badge-ok">Team plan</span>
+                  : <Link className="badge badge-warn" href="/billing" style={{ textDecoration: "none" }}>No team plan</Link>;
+              })() : null}
               <span className="faint" style={{ fontSize: 13 }}>{t.members} members</span>
               <button className="btn btn-sm" aria-expanded={open === t.id} onClick={() => setOpen(open === t.id ? null : t.id)}>
                 {open === t.id ? "Close" : "Members"}

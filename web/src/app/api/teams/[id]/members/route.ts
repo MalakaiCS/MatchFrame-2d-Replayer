@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MANAGE_ROLES, requireUser, userTeams } from "@/lib/access";
+import { billing, planFor } from "@/lib/billing";
 import { q, q1 } from "@/lib/db";
 import { badRequest, body, forbidden, json, notFound, route } from "@/lib/http";
 
@@ -21,6 +22,12 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
   if (p.role === "owner" && me.role !== "owner") throw forbidden("Only an owner can add another owner.");
   const target = await q1<{ id: string }>('select id from "auth_user" where lower(email) = lower($1)', [p.email]);
   if (!target) throw badRequest("No Matchframe account uses that email. Ask them to sign up first.", "NO_ACCOUNT");
+  const limit = billing.teamMemberLimit();
+  if (billing.enabled() && limit && (await planFor({ teamId: id }))?.active) {
+    const n = await q1<{ n: number; already: boolean }>(
+      "select count(*)::int as n, bool_or(user_id = $2) as already from team_members where team_id = $1", [id, target.id]);
+    if (!n?.already && (n?.n ?? 0) >= limit) throw badRequest(`The team plan includes up to ${limit} members.`, "TEAM_FULL");
+  }
   await q(
     `insert into team_members(team_id, user_id, role) values ($1,$2,$3)
      on conflict (team_id, user_id) do update set role = excluded.role`,

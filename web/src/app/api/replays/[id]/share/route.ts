@@ -9,9 +9,9 @@ import { loadManifest } from "@/lib/manifest";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
-async function owner(req: Request, ctx: Ctx) {
+async function owner(req: Request, ctx: Ctx, planCheck = true) {
   const { id } = await ctx.params;
-  const a = await replayAccess(req, id);
+  const a = await replayAccess(req, id, { planCheck });
   if (a.via !== "owner") throw forbidden("Only the owner can manage link sharing.");
   return a;
 }
@@ -80,7 +80,7 @@ export const POST = route(async (req: Request, ctx: Ctx) => {
 
 /** Revoke every active link (or one, with ?linkId=). Subsequent reads with the token fail. */
 export const DELETE = route(async (req: Request, ctx: Ctx) => {
-  const a = await owner(req, ctx);
+  const a = await owner(req, ctx, false);
   const linkId = new URL(req.url).searchParams.get("linkId");
   await q(
     `update share_links set revoked_at = now() where replay_id = $1 and revoked_at is null ${linkId ? "and id = $2" : ""}`,

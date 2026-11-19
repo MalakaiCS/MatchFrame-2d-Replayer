@@ -79,7 +79,7 @@ export const PATCH = route(async (req: Request, ctx: Ctx) => {
 /** Owner-only deletion: access ends immediately; objects are removed by a cleanup job. */
 export const DELETE = route(async (req: Request, ctx: Ctx) => {
   const { id } = await ctx.params;
-  const a = await replayAccess(req, id);
+  const a = await replayAccess(req, id, { planCheck: false });
   if (a.via !== "owner") throw forbidden("Only the owner can delete this replay.");
   await tx(async (c) => {
     await c.query("update replays set status = 'deleted', deleted_at = now(), updated_at = now() where id = $1", [id]);

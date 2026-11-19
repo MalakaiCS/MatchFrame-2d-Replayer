@@ -40,7 +40,7 @@ export const POST = route(async (req: Request, ctx: Ctx) => {
 
 export const DELETE = route(async (req: Request, ctx: Ctx) => {
   const { id } = await ctx.params;
-  const a = await replayAccess(req, id);
+  const a = await replayAccess(req, id, { planCheck: false });
   if (a.via !== "owner") throw forbidden();
   const u = new URL(req.url);
   const teamId = u.searchParams.get("teamId");

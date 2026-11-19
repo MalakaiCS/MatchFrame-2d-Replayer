@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { priceFor } from "@/lib/billing";
 import registry from "@/shared/maps.json";
+import { formatPrice, PLAN_COPY } from "@/shared/plans";
 import "./marketing.css";
 
 export const metadata: Metadata = {
@@ -81,6 +83,8 @@ const FAQ: [string, React.ReactNode][] = [
   ["How long does processing take?", "Typically a minute or two for a full match. You can close the page; the replay appears in your library when it is ready."],
   ["Who can see my replays?", "Only you, until you share. You can add a replay to a team, give one person access, or create a read-only link. Links can be revoked at any time and stop working immediately."],
   ["Can I share a single round?", "Yes. Press “Round link” under the map and send it on. The link opens that one round, and anyone can watch it without an account."],
+  ["What's the difference between Personal and Team?", "Personal covers one account: your own library and uploads, plus any team you're in. Team covers every member of one team for that team's library, so the whole roster can upload and review. The team owner pays and manages the plan."],
+  ["Do people I share with need a plan?", "No. Anyone can watch a read-only or round link without an account. Teammates on a team plan only need a free account."],
   ["Does it show the game in 3D?", "No. Matchframe2D is a 2D radar replayer built for reviewing positions, utility and timing quickly."],
   ["Which maps are supported?", `${MAPS.map((m) => m.name).join(", ")}. Each map uses the official radar and its published coordinates.`],
 ];
@@ -93,7 +97,12 @@ function Icon({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function Landing() {
+/** Prices come from Stripe; refresh the page every ten minutes. */
+export const revalidate = 600;
+
+export default async function Landing() {
+  const [personalPrice, teamPrice] = await Promise.all([priceFor("personal"), priceFor("team")]).catch(() => [null, null]);
+  const prices = { personal: formatPrice(personalPrice), team: formatPrice(teamPrice) };
   return (
     <div className="mk">
       {/* ---------- hero ---------- */}
@@ -279,6 +288,31 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ---------- plans ---------- */}
+      <section className="mk-section" id="plans" aria-labelledby="plans-title">
+        <div className="mk-wrap">
+          <p className="mk-eyebrow">Plans</p>
+          <h2 id="plans-title">For you, or for the whole team</h2>
+          <p className="mk-sub">A personal plan is for one person. A team plan covers everyone on the roster, and members only need a free account.</p>
+          <div className="mk-plans">
+            {(["personal", "team"] as const).map((k) => (
+              <article key={k} className={`mk-plan${k === "team" ? " mk-plan-team" : ""}`}>
+                <header>
+                  <h3>{PLAN_COPY[k].name}</h3>
+                  <p>{PLAN_COPY[k].tagline}</p>
+                  {prices[k] ? <p className="mk-plan-price">{prices[k]}</p> : null}
+                </header>
+                <ul>{PLAN_COPY[k].points.map((p) => <li key={p}>{p}</li>)}</ul>
+                <Link className={`mk-btn${k === "team" ? " mk-btn-primary" : ""}`} href={`/signup?next=${encodeURIComponent("/billing")}`}>
+                  {k === "team" ? "Get a team plan" : "Get Personal"}
+                </Link>
+              </article>
+            ))}
+          </div>
+          <p className="mk-plan-note">Anyone can watch a read-only or round link you share, with no account and no plan.</p>
+        </div>
+      </section>
+
       {/* ---------- FAQ ---------- */}
       <section className="mk-section" id="faq" aria-labelledby="faq-title">
         <div className="mk-wrap mk-faq-wrap">
@@ -317,6 +351,7 @@ export default function Landing() {
             <a href="#features">Features</a>
             <a href="#how">How it works</a>
             <a href="#maps">Maps</a>
+            <a href="#plans">Plans</a>
             <a href="#faq">FAQ</a>
             <Link href="/login">Sign in</Link>
           </nav>

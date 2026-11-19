@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/access";
+import { assertCanStartUpload, assertCanUploadTo } from "@/lib/billing";
 import { q1 } from "@/lib/db";
 import { env } from "@/lib/env";
 import { badRequest, body, json, route } from "@/lib/http";
@@ -14,12 +15,16 @@ const ACCEPTED = /\.(dem|bz2|gz|zip|rar)$/;
 const Req = z.object({
   filename: z.string().min(1).max(255),
   size: z.number().int().positive(),
+  /** Where the replay will go; checked against plans up front so a large upload is not wasted. */
+  teamId: z.string().max(64).nullable().optional(),
 });
 
 /** Create a bounded, short-lived upload slot for one .dem file. */
 export const POST = route(async (req: Request) => {
   const user = await requireUser(req);
-  const { filename, size } = await body(req, Req);
+  const { filename, size, teamId } = await body(req, Req);
+  if (teamId !== undefined) await assertCanUploadTo(user.id, teamId);
+  else await assertCanStartUpload(user.id);
   const lower = filename.toLowerCase();
   if (/\.(7z|xz|zst|tar)$/.test(lower)) {
     throw badRequest("This archive type is not supported. Upload a .dem, .dem.bz2, .dem.gz, .zip or .rar file.", "UNSUPPORTED_ARCHIVE");

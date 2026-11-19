@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/access";
+import { assertCanUploadTo } from "@/lib/billing";
 import { tx } from "@/lib/db";
 import { env } from "@/lib/env";
 import { badRequest, body, conflict, json, notFound, route } from "@/lib/http";
@@ -25,6 +26,8 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
   const user = await requireUser(req);
   const { id } = await ctx.params;
   const opts = await body(req, Req);
+  // Checked before the transaction so a missing plan leaves the upload slot usable after subscribing.
+  await assertCanUploadTo(user.id, opts.teamId ?? null);
   const storage = getStorage();
 
   return tx(async (c) => {

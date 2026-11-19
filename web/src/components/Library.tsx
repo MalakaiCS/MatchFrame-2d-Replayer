@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { PlanNotice } from "./BillingPage";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { mapIcon } from "@/viewer/icons";
@@ -122,6 +123,8 @@ export function Library() {
         </div>
         <Link className="btn btn-primary" href="/replays/new"><IconUpload /> Upload demo</Link>
       </div>
+
+      <PlanNotice />
 
       <div className="lib-tabs" role="tablist" aria-label="Library sections">
         {(["replays", "catalogue", "playlists"] as Tab[]).map((t) => (

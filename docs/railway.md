@@ -77,3 +77,53 @@ Round links (one round, viewable without an account) use a token derived from th
 `AUTH_SECRET`. Keep `AUTH_SECRET` stable: rotating it signs everyone out and turns existing round
 links off (new ones can be copied straight away). Run the migrations on deploy as usual; the
 web service's start command already applies `004_round_share_links.sql`.
+
+## Plans and Stripe (personal and team subscriptions)
+
+Plans are off until you turn them on, so the site works before Stripe is set up.
+
+1. In Stripe, create two products with a recurring price each: **Personal** and **Team**. Copy the
+   price ids (`price_...`).
+2. In Stripe → Developers → Webhooks, add an endpoint
+   `https://2d.matchframe.tv/api/billing/webhook` with these events:
+   `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`,
+   `customer.subscription.paused`, `customer.subscription.resumed`. Copy its signing secret (`whsec_...`).
+3. In Stripe → Settings → Billing → Customer portal, turn the portal on (cancel, update card, invoices).
+4. On the Railway **web** service, set the variables below, then redeploy:
+
+   | Variable | Value |
+   |---|---|
+   | `STRIPE_SECRET_KEY` | `sk_live_...` (or `sk_test_...` while testing) |
+   | `STRIPE_WEBHOOK_SECRET` | `whsec_...` from step 2 |
+   | `STRIPE_PRICE_PERSONAL` | the Personal price id |
+   | `STRIPE_PRICE_TEAM` | the Team price id |
+   | `BILLING_ENABLED` | `1` when you are ready to require plans |
+   | `TEAM_PLAN_MAX_MEMBERS` | optional member cap for team plans (`0` = none) |
+
+What each plan covers:
+
+- **Personal**: one account, everywhere (own library, uploads, replays shared with them, and any team they are in).
+- **Team**: every member of that team, for the team library (upload to the team, open and review team
+  replays and replays shared with the team). Members only need a free account. Only the team owner can buy
+  or manage it.
+- **Links**: read-only and round links are free to watch for anyone.
+- Without a plan, a signed-in user can still delete their replays and revoke links.
+
+Granting a plan by hand (partners, comps, testing), from the web service's shell (`railway ssh`, or
+`railway run` locally with the production `DATABASE_URL`):
+
+```bash
+node scripts/grant-plan.mjs personal player@example.com --until 2027-01-31 --note "partner"
+```
+
+```bash
+node scripts/grant-plan.mjs team "Harbour Esports"
+```
+
+```bash
+node scripts/grant-plan.mjs list
+```
+
+```bash
+node scripts/grant-plan.mjs revoke personal player@example.com
+```

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { PlanNotice } from "./BillingPage";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, putWithProgress } from "./api";
@@ -86,7 +87,7 @@ export function UploadFlow() {
     abort.current = new AbortController();
     try {
       setStage("uploading");
-      const slot = await api<UploadSlot>("/api/uploads", { method: "POST", json: { filename: file.name, size: file.size } });
+      const slot = await api<UploadSlot>("/api/uploads", { method: "POST", json: { filename: file.name, size: file.size, teamId: String(form.get("teamId") || "") || null } });
       await putWithProgress(slot.upload.url, file, slot.upload.headers, setProgress, abort.current.signal);
       setStage("finalising");
       const seriesId = String(form.get("seriesId") || "").trim();
@@ -112,6 +113,7 @@ export function UploadFlow() {
   return (
     <div className="page" style={{ maxWidth: 720 }}>
       <h1>Upload a demo</h1>
+      <PlanNotice />
       <p className="page-sub">CS2 demos as <span className="mono">.dem</span>, or compressed as <span className="mono">.dem.bz2</span>, <span className="mono">.dem.gz</span>, <span className="mono">.zip</span> or <span className="mono">.rar</span>. An archive with several maps (e.g. a BO3) becomes one replay per map, linked as a series. Up to {MAX_HINT / 1024} GiB per upload. Uploads are private until you share them.</p>
 
       <div className="steps" aria-label="Progress">
