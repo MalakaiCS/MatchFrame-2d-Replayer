@@ -28,6 +28,7 @@ interface ReplayItem {
   teamName: string | null;
   isOwner: boolean;
   visibility: string;
+  teamId: string | null;
   seriesId: string | null;
   seriesMapIndex: number | null;
 }
@@ -75,6 +76,11 @@ export function Library({ space = "personal" }: { space?: Space }) {
   const tabs: Tab[] = space === "team" ? ["replays", "playlists"] : ["replays", "playlists", "catalogue"];
   const tab = tabs.includes(params.get("tab") as Tab) ? (params.get("tab") as Tab) : "replays";
   const [teams, setTeams] = useState<TeamItem[] | null>(space === "team" ? null : []);
+  // Teams you can move your demos into (any role but viewer).
+  const [moveTeams, setMoveTeams] = useState<TeamItem[]>([]);
+  useEffect(() => {
+    api<{ teams: TeamItem[] }>("/api/teams").then((r) => setMoveTeams(r.teams.filter((t) => t.role !== "viewer"))).catch(() => {});
+  }, []);
   const teamId = space === "team" ? (teams?.find((t) => t.id === params.get("team"))?.id ?? teams?.[0]?.id ?? null) : null;
   const team = teams?.find((t) => t.id === teamId) ?? null;
   const [q, setQ] = useState(params.get("q") ?? "");
@@ -211,7 +217,8 @@ export function Library({ space = "personal" }: { space?: Space }) {
         ) : (
           <div className="replay-list">
             {replays.map((r) => (
-              <Link key={r.id} href={`/replays/${r.id}`} className="replay-item" aria-label={`${r.title ?? `${r.teamA ?? "Team A"} vs ${r.teamB ?? "Team B"}`}, ${mapName(r.mapId)}, ${r.status}`}>
+              <div key={r.id} className="replay-row">
+              <Link href={`/replays/${r.id}`} className="replay-item" aria-label={`${r.title ?? `${r.teamA ?? "Team A"} vs ${r.teamB ?? "Team B"}`}, ${mapName(r.mapId)}, ${r.status}`}>
                 <MapTile mapId={r.mapId} />
                 <div style={{ minWidth: 0 }}>
                   <div className="replay-title">
@@ -237,6 +244,8 @@ export function Library({ space = "personal" }: { space?: Space }) {
                   <StatusBadge status={r.status} />
                 </div>
               </Link>
+              {r.isOwner ? <MoveControl replay={r} teams={moveTeams} onMoved={load} /> : null}
+              </div>
             ))}
           </div>
         )
@@ -321,6 +330,38 @@ function PlaylistsTab({ playlists, reload, teamId }: { playlists: PlaylistItem[]
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Move one of your demos between Personal (only you) and a team (everyone on it). */
+function MoveControl({ replay, teams, onMoved }: { replay: ReplayItem; teams: TeamItem[]; onMoved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const current = replay.teamId && replay.visibility === "team" ? replay.teamId : "";
+  if (!teams.length && !current) return null;
+  async function move(to: string) {
+    if (to === current) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/replays/${replay.id}`, { method: "PATCH", json: to ? { teamId: to, visibility: "team" } : { teamId: null, visibility: "private" } });
+      onMoved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not move the demo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="move-ctl">
+      <label className="sr-only" htmlFor={`move-${replay.id}`}>Move {replay.title ?? "demo"} to</label>
+      <select id={`move-${replay.id}`} className="select btn-sm" style={{ height: 28 }} value={current} disabled={busy}
+        onChange={(e) => move(e.target.value)} title="Move to Personal or a team">
+        <option value="">Personal</option>
+        {teams.map((t) => <option key={t.id} value={t.id}>Team: {t.name}</option>)}
+      </select>
+      {error ? <span className="move-err" role="alert">{error}</span> : null}
     </div>
   );
 }

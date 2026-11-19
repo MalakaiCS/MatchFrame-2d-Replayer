@@ -191,6 +191,9 @@ describe.skipIf(!BASE)("plans", () => {
     expect(mb.access).toMatchObject({ personal: false, coveredTeams: [teamId], canUse: true });
     expect(mb.teams[0]).toMatchObject({ id: teamId, canManageBilling: false });
     expect(mb.teams[0].plan.active).toBe(true);
+    // Tom has only the team plan: moving the team demo to his personal library would lock it, so it is refused.
+    const moved = await tom.json(`/api/replays/${teamReplay}`, { method: "PATCH", json: { teamId: null, visibility: "private" } }, 402);
+    expect(moved.error.code).toBe("SUBSCRIPTION_REQUIRED");
   }, 120_000);
 
   it("a personal replay shared with a team-plan member stays locked for them, but links are free", async () => {

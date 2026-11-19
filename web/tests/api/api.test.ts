@@ -482,3 +482,34 @@ describe("heatmaps and utility", () => {
   });
 });
 
+describe("moving demos and invite links", () => {
+  it("owner moves a demo into a team and back; others cannot", async () => {
+    const t = await owner.json("/api/teams", { method: "POST", json: { name: `Move ${run}` } }, 201);
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamId: t.id, visibility: "team" } }, 200);
+    expect((await owner.json(`/api/replays?scope=team&teamId=${t.id}`)).replays.map((r: any) => r.id)).toContain(replayId);
+    expect((await owner.json("/api/replays?scope=personal")).replays.map((r: any) => r.id)).not.toContain(replayId);
+    expect((await mate.req(`/api/replays/${replayId}`, { method: "PATCH", json: { teamId: null, visibility: "private" } })).status).toBe(403);
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamId: null, visibility: "private" } }, 200);
+    expect((await owner.json("/api/replays?scope=personal")).replays.map((r: any) => r.id)).toContain(replayId);
+  });
+
+  it("invite links add members with the chosen role, expire on revoke, and only managers create them", async () => {
+    const t = await owner.json("/api/teams", { method: "POST", json: { name: `Invite ${run}` } }, 201);
+    const inv = await owner.json(`/api/teams/${t.id}/invites`, { method: "POST", json: { role: "analyst" } }, 201);
+    expect((await outsider.json(`/api/invites?token=${inv.token}`, {}, 200))).toMatchObject({ teamName: `Invite ${run}`, role: "analyst", alreadyMember: false });
+    expect((await anon.req(`/api/invites?token=${inv.token}`)).status).toBe(401);
+    const joined = await outsider.json("/api/invites", { method: "POST", json: { token: inv.token } }, 201);
+    expect(joined).toMatchObject({ teamId: t.id, joined: true, role: "analyst" });
+    expect((await outsider.json("/api/invites", { method: "POST", json: { token: inv.token } }, 200)).joined).toBe(false);
+    const team = await owner.json(`/api/teams/${t.id}`, {}, 200);
+    expect(team.members.find((m: any) => m.role === "analyst")).toBeTruthy();
+    // Analysts cannot create invites; owner role cannot be invited.
+    expect((await outsider.req(`/api/teams/${t.id}/invites`, { method: "POST", json: { role: "player" } })).status).toBe(403);
+    expect((await owner.req(`/api/teams/${t.id}/invites`, { method: "POST", json: { role: "owner" } })).status).toBe(400);
+    await owner.json(`/api/teams/${t.id}/invites`, { method: "DELETE" }, 200);
+    expect((await mate.req(`/api/invites?token=${inv.token}`)).status).toBe(404);
+    expect((await mate.req("/api/invites", { method: "POST", json: { token: inv.token } })).status).toBe(404);
+    expect((await mate.req("/api/invites", { method: "POST", json: { token: "x".repeat(43) } })).status).toBe(404);
+  });
+});
+

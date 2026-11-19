@@ -548,3 +548,14 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
 .ins-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
 .ins-examples { list-style: none; margin: 2px 0 8px 34px; padding: 0; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
 @media (max-width: 900px) { .ins-body { grid-template-columns: 1fr; } }
+
+/* invite links */
+.invite-box { margin-top: 14px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); }
+.invite-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+
+/* move demos between Personal and Team */
+.replay-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.move-ctl { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; max-width: 220px; }
+.move-err { color: var(--danger); font-size: 11px; }
+@media (max-width: 900px) { .replay-row { grid-template-columns: 1fr; } .move-ctl { align-items: flex-start; } }
+.move-ctl select { width: 170px; }

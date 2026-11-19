@@ -2,6 +2,7 @@ import { z } from "zod";
 import { replayAccess, VISIBLE_REPLAYS_SQL } from "@/lib/access";
 import { q, tx } from "@/lib/db";
 import { badRequest, body, forbidden, json, notFound, route } from "@/lib/http";
+import { assertCanUploadTo } from "@/lib/billing";
 import { loadManifest } from "@/lib/manifest";
 import { accessView, publicReplay } from "@/lib/replay-view";
 
@@ -58,6 +59,11 @@ export const PATCH = route(async (req: Request, ctx: Ctx) => {
   if (p.teamId) {
     const m = a.teams.find((t) => t.team_id === p.teamId);
     if (!m || m.role === "viewer") throw badRequest("You cannot assign replays to that team.");
+  }
+  // Moving between Personal and a team: the destination must be covered by a plan (when plans are on).
+  if (p.teamId !== undefined || p.visibility !== undefined) {
+    const dest = p.teamId !== undefined ? p.teamId : (p.visibility === "private" ? null : a.replay.team_id);
+    await assertCanUploadTo(a.user!.id, p.visibility === "private" ? null : dest);
   }
   const sets: string[] = [];
   const vals: unknown[] = [id];

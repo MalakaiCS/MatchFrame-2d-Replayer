@@ -145,6 +145,7 @@ export function TeamsPage() {
                     <button className="btn">Add member</button>
                   </form>
                 ) : null}
+                {canManage ? <InviteLinks teamId={t.id} myRole={myRole} /> : null}
                 <ul className="faint" style={{ fontSize: 12, marginTop: 12 }}>
                   {ROLES.map((r) => <li key={r}><strong>{r}</strong>: {ROLE_HELP[r]}</li>)}
                 </ul>
@@ -153,6 +154,80 @@ export function TeamsPage() {
           </section>
         ))}
       </div>
+    </div>
+  );
+}
+
+interface Invite { id: string; role: string; createdAt: string; expiresAt: string; maxUses: number | null; uses: number; createdBy: string }
+
+/** Invite links: anyone with the link and an account joins with the chosen role. */
+function InviteLinks({ teamId, myRole }: { teamId: string; myRole: string }) {
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [link, setLink] = useState<string | null>(null);
+  const [role, setRole] = useState("player");
+  const [days, setDays] = useState(7);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    api<{ invites: Invite[] }>(`/api/teams/${teamId}/invites`).then((r) => setInvites(r.invites)).catch(() => {});
+  }, [teamId]);
+  useEffect(() => load(), [load]);
+
+  async function create() {
+    setError(null);
+    setCopied(false);
+    try {
+      const r = await api<{ token: string }>(`/api/teams/${teamId}/invites`, { method: "POST", json: { role, days } });
+      setLink(`${window.location.origin}/join/${r.token}`);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create the invite link.");
+    }
+  }
+  async function copy() {
+    if (!link) return;
+    try { await navigator.clipboard.writeText(link); setCopied(true); } catch { window.prompt("Invite link", link); }
+  }
+  async function revoke(id?: string) {
+    await api(`/api/teams/${teamId}/invites${id ? `?inviteId=${id}` : ""}`, { method: "DELETE" });
+    if (!id) setLink(null);
+    load();
+  }
+
+  return (
+    <div className="invite-box">
+      <strong style={{ fontSize: 13 }}>Invite link</strong>
+      <p className="faint" style={{ margin: "2px 0 8px", fontSize: 12 }}>Anyone with the link and a Matchframe account joins the team. They can sign up from the link.</p>
+      <div className="row wrap">
+        <label className="sr-only" htmlFor={`inv-role-${teamId}`}>Role for people who join</label>
+        <select id={`inv-role-${teamId}`} className="select btn-sm" style={{ height: 28 }} value={role} onChange={(e) => setRole(e.target.value)}>
+          {(["coach", "analyst", "player", "viewer"] as const).map((r) => <option key={r} value={r} disabled={r === "coach" && myRole !== "owner"}>Join as {r}</option>)}
+        </select>
+        <label className="sr-only" htmlFor={`inv-days-${teamId}`}>Expires after</label>
+        <select id={`inv-days-${teamId}`} className="select btn-sm" style={{ height: 28 }} value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          {[1, 7, 30].map((d) => <option key={d} value={d}>Expires in {d} day{d === 1 ? "" : "s"}</option>)}
+        </select>
+        <button type="button" className="btn btn-sm" onClick={create}>Create invite link</button>
+      </div>
+      {link ? (
+        <div className="row" style={{ marginTop: 8 }}>
+          <input className="input grow mono" readOnly value={link} aria-label="Invite link" onFocus={(e) => e.target.select()} style={{ height: 28, fontSize: 12 }} />
+          <button type="button" className="btn btn-sm" onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+        </div>
+      ) : null}
+      {error ? <p className="alert alert-err" role="alert">{error}</p> : null}
+      {invites.length ? (
+        <ul className="invite-list">
+          {invites.map((i) => (
+            <li key={i.id} className="row">
+              <span className="grow faint" style={{ fontSize: 12 }}>
+                Joins as {i.role} · used {i.uses}{i.maxUses ? `/${i.maxUses}` : ""} · expires {new Date(i.expiresAt).toLocaleDateString()} · by {i.createdBy}
+              </span>
+              <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={() => revoke(i.id)}>Revoke</button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
