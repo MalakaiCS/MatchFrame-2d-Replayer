@@ -591,3 +591,22 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
   .page { max-width: none !important; padding: 0 !important; }
 }
 .st-two { align-items: start; }
+
+.clip-rec { background: var(--danger) !important; color: #fff !important; border-color: var(--danger) !important; }
+
+/* compare rounds */
+.cmp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cmp-panel { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.cmp-canvas { width: 100%; aspect-ratio: 1; background: #080b0f; border-radius: var(--radius-sm); }
+.cmp-transport { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+@media (max-width: 900px) { .cmp-grid { grid-template-columns: 1fr; } }
+
+/* tactic boards */
+.tb-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
+.tb-tools { display: flex; flex-direction: column; gap: 10px; }
+.tb-canvas { width: 100%; max-width: 860px; aspect-ratio: 1; border-radius: var(--radius-sm); border: 1px solid var(--border); touch-action: none; cursor: crosshair; }
+.tb-canvas[data-tool="move"] { cursor: grab; }
+.tb-name { font-size: 20px; font-weight: 700; height: 40px; max-width: 520px; flex: 1; }
+.tb-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border-strong); cursor: pointer; }
+.tb-swatch[aria-pressed="true"] { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+@media (max-width: 900px) { .tb-layout { grid-template-columns: 1fr; } }

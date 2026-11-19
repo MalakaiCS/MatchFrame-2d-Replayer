@@ -198,6 +198,37 @@ test("bulk upload queues several demos and processes each", async ({ page }) => 
   await expect(page.locator('.bulk-item[data-state="ready"]')).toHaveCount(2, { timeout: 90_000 });
 });
 
+test("clip export, tactic board from a replay moment, and round comparison", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${replayUrl}?r=r03&t=20000`);
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeEnabled({ timeout: 15_000 });
+  await page.locator("#speed").selectOption("8");
+  // Clip: 10 s of replay at 8x records ~1.3 s of video, then downloads.
+  const download = page.waitForEvent("download", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Clip" }).click();
+  await page.getByRole("menuitem", { name: "10 seconds" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^de_mirage-round3-\d+s\.webm$/);
+
+  // Board from this moment: positions become tokens on a new board that saves.
+  await page.getByRole("button", { name: "Board", exact: true }).click();
+  await page.waitForURL(/\/tactics\/[A-Za-z0-9]+$/);
+  await expect(page.getByLabel("Board name")).toHaveValue(/Mirage · round 3 at/);
+  await page.getByRole("button", { name: "Smoke" }).click();
+  await page.locator(".tb-canvas").click({ position: { x: 200, y: 200 } });
+  await expect(page.getByText("All changes saved")).toBeVisible({ timeout: 10_000 });
+  await page.screenshot({ path: path.join(OUT, "tactic-board.png") });
+
+  // Compare two rounds picked in round search.
+  await page.goto(`${replayUrl}`);
+  const id = replayUrl.split("/").pop();
+  await page.goto(`${BASE}/replays/compare?a=${id}~r02&b=${id}~r05`);
+  await expect(page.locator(".cmp-canvas")).toHaveCount(2);
+  await expect(page.getByText("Round 2")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Play" }).click();
+  await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+});
+
 test("narrow screen keeps map and playback visible", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();

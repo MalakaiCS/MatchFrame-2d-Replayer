@@ -553,3 +553,28 @@ describe("watchlist and tendencies", () => {
   });
 });
 
+describe("tactic boards", () => {
+  it("creates personal and team boards; teammates read, viewers cannot edit, stale saves are refused", async () => {
+    const mine = await owner.json("/api/tactics", { method: "POST", json: { name: "B split", mapId: "de_mirage" } }, 201);
+    expect((await outsider.req(`/api/tactics/${mine.id}`)).status).toBe(404);
+    const b = await owner.json(`/api/tactics/${mine.id}`, {}, 200);
+    expect(b).toMatchObject({ name: "B split", mapId: "de_mirage", mine: true });
+    const data = { floor: 0, tokens: [{ id: "x", kind: "ct", x: 100, y: 200, label: "1" }], strokes: [{ color: "#ff5d73", width: 3, arrow: true, points: [[1, 2], [3, 4]] }] };
+    const v2 = await owner.json(`/api/tactics/${mine.id}`, { method: "PUT", json: { data, version: b.version } }, 200);
+    expect((await owner.req(`/api/tactics/${mine.id}`, { method: "PUT", json: { data, version: b.version } })).status).toBe(409);
+    expect((await owner.json(`/api/tactics/${mine.id}`, {}, 200)).data.tokens).toHaveLength(1);
+    expect((await owner.req("/api/tactics", { method: "POST", json: { name: "x", mapId: "de_nowhere" } })).status).toBe(400);
+    expect((await owner.req(`/api/tactics/${mine.id}`, { method: "PUT", json: { data: { ...data, tokens: [{ id: "y", kind: "nope", x: 1, y: 1 }] }, version: v2.version } })).status).toBe(400);
+
+    const t = await owner.json("/api/teams", { method: "POST", json: { name: `Boards ${run}` } }, 201);
+    await owner.json(`/api/teams/${t.id}/members`, { method: "POST", json: { email: mateEmail, role: "viewer" } }, 201);
+    const team = await owner.json("/api/tactics", { method: "POST", json: { name: "Retake A", mapId: "de_nuke", teamId: t.id } }, 201);
+    expect((await mate.json("/api/tactics", {}, 200)).boards.some((x: any) => x.id === team.id)).toBe(true);
+    const tb = await mate.json(`/api/tactics/${team.id}`, {}, 200);
+    expect((await mate.req(`/api/tactics/${team.id}`, { method: "PUT", json: { data, version: tb.version } })).status).toBe(403);
+    expect((await mate.req(`/api/tactics/${team.id}`, { method: "DELETE" })).status).toBe(403);
+    await owner.json(`/api/tactics/${team.id}`, { method: "DELETE" }, 200);
+    await owner.json(`/api/tactics/${mine.id}`, { method: "DELETE" }, 200);
+  });
+});
+

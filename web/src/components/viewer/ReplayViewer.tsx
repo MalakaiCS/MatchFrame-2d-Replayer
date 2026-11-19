@@ -424,6 +424,23 @@ function Workspace({
         } else {
           drawFrame(ctx, { ...common, floor: o.floor, radar: radarImgs.current.get(o.floor === "auto" ? 0 : o.floor) ?? null });
         }
+        if (captionRef.current) {
+          // Burned into exported clips: round, clock and score.
+          const text = captionRef.current();
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.font = "700 13px ui-sans-serif, system-ui, sans-serif";
+          const tw = ctx.measureText(text).width;
+          ctx.fillStyle = "rgba(8, 11, 15, 0.85)";
+          ctx.fillRect(10, 10, tw + 20, 26);
+          ctx.fillStyle = "#e6edf4";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(text, 20, 23.5);
+          ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+          ctx.fillStyle = "rgba(230, 237, 244, 0.6)";
+          ctx.textAlign = "right";
+          ctx.fillText("Matchframe2D", w - 12, h - 12);
+        }
         lastFrame.current = frame;
         dirty.current = playingRef.current;
       }
@@ -440,6 +457,45 @@ function Workspace({
   const playersRef = useRef(players);
   playersRef.current = players;
   const lastFrame = useRef<Frame | null>(null);
+  /** Copy the current moment onto a new tactic board and open it. */
+  const sendToBoard = useCallback(async () => {
+    const frame = lastFrame.current;
+    if (!frame) return;
+    const r = roundRef.current;
+    const pos = (x: number, y: number) => {
+      const [px, py] = worldToImage(map, x, y);
+      return { x: Math.round(px * 10) / 10, y: Math.round(py * 10) / 10 };
+    };
+    const tokens: { id: string; kind: string; x: number; y: number; label?: string }[] = [];
+    for (const p of frame.players) {
+      const info = playersRef.current.get(p.id);
+      if (!info || !p.visible || !p.alive) continue;
+      tokens.push({ id: p.id.slice(-10), kind: info.side === "CT" ? "ct" : "t", ...pos(p.x, p.y), label: info.name.slice(0, 3) });
+    }
+    for (const e of frame.effects) {
+      const k = e.effect.kind;
+      if (k === "smoke" || k === "fire") tokens.push({ id: e.effect.id.slice(-10), kind: k === "smoke" ? "smoke" : "molotov", ...pos(e.effect.position.x, e.effect.position.y) });
+    }
+    if (frame.bomb.position && frame.bomb.state !== "carried" && frame.bomb.state !== "unknown") tokens.push({ id: "bomb", kind: "bomb", ...pos(frame.bomb.position.x, frame.bomb.position.y) });
+    const ms = Math.max(0, Math.round((tickRef.current - (r.freezeEndTick ?? r.startTick)) * manifest.tickIntervalMs));
+    try {
+      const res = await api<{ id: string }>("/api/tactics", {
+        method: "POST",
+        json: {
+          name: `${mapName(manifest.map.id)} · round ${r.displayNumber} at ${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`,
+          mapId: manifest.map.id,
+          teamId: data.replay.visibility === "team" ? data.replay.teamId : null,
+          data: { floor: typeof floor === "number" ? floor : 0, tokens, strokes: [] },
+        },
+      });
+      router.push(`/tactics/${res.id}`);
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "Could not create the board.");
+    }
+  }, [map, manifest, data.replay.visibility, data.replay.teamId, floor, router]);
+
+  /** While recording a clip: returns the caption to burn into each frame. */
+  const captionRef = useRef<(() => string) | null>(null);
   useEffect(() => { dirty.current = true; }, [players, selected, follow, floor, toggles, index, mutedRadar, reviewOpen]);
 
   // redraw on resize
@@ -678,6 +734,25 @@ function Workspace({
               <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(1.25)} aria-label="Zoom in"><IconZoomIn /></button>
               <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => zoom(0.8)} aria-label="Zoom out"><IconZoomOut /></button>
               <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={resetView} aria-label="Reset view"><IconFit /></button>
+              {!viaShare && data.access.signedIn ? (
+                <button type="button" className="btn btn-ghost btn-sm" disabled={!index} onClick={sendToBoard}
+                  title="Copy this moment (positions, smokes and molotovs) onto a new tactic board">Board</button>
+              ) : null}
+              <ClipButton canvasRef={canvasRef} disabled={!index}
+                onStart={(secs) => {
+                  captionRef.current = () => {
+                    const r = roundRef.current;
+                    const ms = Math.max(0, Math.round((tickRef.current - (r.freezeEndTick ?? r.startTick)) * manifest.tickIntervalMs));
+                    return `${manifest.teams.A.name} ${r.scoreBefore.A}–${r.scoreBefore.B} ${manifest.teams.B.name} · Round ${r.displayNumber} · ${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+                  };
+                  dirty.current = true;
+                  setPlaying(true);
+                  const r = roundRef.current;
+                  const left = ((r.endTick - 1 - tickRef.current) / manifest.tickRate) * 1000 / speedRef.current;
+                  return secs === "end" ? left : Math.min(left, (secs * 1000) / speedRef.current);
+                }}
+                onStop={() => { captionRef.current = null; setPlaying(false); dirty.current = true; }}
+                fileName={() => `${manifest.map.id}-round${roundRef.current.displayNumber}-${Math.round(tickToRoundMs(Math.round(tickRef.current), roundRef.current, manifest.tickIntervalMs) / 1000)}s.webm`} />
               <button type="button" className="btn btn-ghost btn-sm" aria-pressed={follow} disabled={!selected} onClick={() => setFollow(!follow)}
                 title={selected ? "Keep the selected player centred" : "Select a player to follow"}>Follow</button>
               {map.floors.length > 1 ? (
@@ -896,3 +971,90 @@ function usePlaylistNav(params: ReturnType<typeof useSearchParams>, replayId: st
   };
 }
 
+
+/**
+ * Record the radar as a WebM clip (browser MediaRecorder on the canvas): plays from the current
+ * moment for the chosen length at the current speed, then downloads the file.
+ */
+function ClipButton({ canvasRef, disabled, onStart, onStop, fileName }: {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  disabled: boolean;
+  /** Starts playback; returns how long to record (ms of wall time). */
+  onStart: (secs: number | "end") => number;
+  onStop: () => void;
+  fileName: () => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rec, setRec] = useState<{ until: number } | null>(null);
+  const [now, setNow] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
+  const supported = typeof window !== "undefined" && "MediaRecorder" in window;
+
+  useEffect(() => {
+    if (!rec) return;
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [rec]);
+
+  function start(secs: number | "end") {
+    setOpen(false);
+    setError(null);
+    const canvas = canvasRef.current;
+    if (!canvas || !supported) return setError("Your browser cannot record video.");
+    const stream = canvas.captureStream(30);
+    const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m)) ?? "";
+    const recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 6_000_000 } : undefined);
+    const chunks: Blob[] = [];
+    const name = fileName();
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunks, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    };
+    recorder.start(250);
+    const ms = Math.max(500, onStart(secs));
+    const finish = () => {
+      clearTimeout(timer);
+      stopRef.current = null;
+      if (recorder.state !== "inactive") recorder.stop();
+      setRec(null);
+      onStop();
+    };
+    const timer = setTimeout(finish, ms);
+    stopRef.current = finish;
+    setRec({ until: Date.now() + ms });
+    setNow(Date.now());
+  }
+
+  if (rec) {
+    return (
+      <button type="button" className="btn btn-sm clip-rec" onClick={() => stopRef.current?.()} aria-label="Stop recording and download the clip">
+        ● Rec {Math.max(0, Math.ceil((rec.until - now) / 1000))}s · Stop
+      </button>
+    );
+  }
+  return (
+    <span className="tool-pop" style={{ position: "relative" }}>
+      <button type="button" className="btn btn-ghost btn-sm" disabled={disabled || !supported} aria-expanded={open} onClick={() => setOpen((v) => !v)}
+        title={supported ? "Record a video clip of the radar" : "Your browser cannot record video"}>Clip</button>
+      {open ? (
+        <div className="tool-menu card" role="menu" aria-label="Clip length">
+          <span className="faint" style={{ fontSize: 12 }}>Record from now at the current speed:</span>
+          {[10, 20, 30].map((s) => <button key={s} type="button" role="menuitem" className="btn btn-sm" onClick={() => start(s)}>{s} seconds</button>)}
+          <button type="button" role="menuitem" className="btn btn-sm" onClick={() => start("end")}>To the end of the round</button>
+          <span className="faint" style={{ fontSize: 11 }}>Saves a .webm video of the radar with the score and clock.</span>
+        </div>
+      ) : null}
+      {error ? <span className="move-err">{error}</span> : null}
+    </span>
+  );
+}

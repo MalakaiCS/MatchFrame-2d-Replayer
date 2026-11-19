@@ -19,5 +19,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/replays", "/replays/new", "/replays/team", "/teams", "/teams/:path*", "/playlists/:path*", "/billing", "/stats", "/stats/team", "/stats/rounds", "/join/:path*"],
+  matcher: ["/replays", "/replays/new", "/replays/team", "/replays/compare", "/teams", "/teams/:path*", "/playlists/:path*", "/billing", "/stats", "/stats/team", "/stats/rounds", "/join/:path*", "/tactics", "/tactics/:path*"],
 };

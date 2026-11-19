@@ -33,6 +33,9 @@ export function RoundSearch() {
   const [data, setData] = useState<{ searched: number; pending: number; truncated: boolean; results: Result[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [teamText, setTeamText] = useState(get("team"));
+  // Up to two rounds picked for side-by-side comparison ("<replay>~<round>").
+  const [pick, setPick] = useState<string[]>([]);
+  const togglePick = (k: string) => setPick((xs) => (xs.includes(k) ? xs.filter((x) => x !== k) : [...xs, k].slice(-2)));
   const searchKey = `${params.toString()}`;
 
   const set = (over: Record<string, string>) => {
@@ -118,6 +121,10 @@ export function RoundSearch() {
       {data ? (
         <p className="faint" style={{ fontSize: 13 }}>
           {data.results.length}{data.truncated ? "+" : ""} rounds in {data.searched} demos{data.pending ? `, searching ${data.pending} more…` : ""}
+          {" · "}
+          {pick.length === 2
+            ? <Link className="btn btn-sm btn-primary" href={`/replays/compare?a=${pick[0]}&b=${pick[1]}`}>Compare the 2 picked rounds</Link>
+            : <span>tick two rounds to compare them side by side</span>}
         </p>
       ) : <p className="muted">Searching…</p>}
 
@@ -125,10 +132,14 @@ export function RoundSearch() {
         <div className="ms-table-wrap">
           <div className="ms-scroll">
             <table className="ms-table rs-table">
-              <thead><tr><th className="ms-name">Match</th><th>Map</th><th>Round</th><th>Side</th><th>Result</th><th className="ms-name">Tags</th><th /></tr></thead>
+              <thead><tr><th><span className="sr-only">Compare</span></th><th className="ms-name">Match</th><th>Map</th><th>Round</th><th>Side</th><th>Result</th><th className="ms-name">Tags</th><th /></tr></thead>
               <tbody>
                 {data.results.map((r) => (
                   <tr key={`${r.replayId}-${r.id}-${r.team}`}>
+                    <td>
+                      <input type="checkbox" aria-label={`Compare round ${r.number} of ${r.team} vs ${r.opponent}`}
+                        checked={pick.includes(`${r.replayId}~${r.id}`)} onChange={() => togglePick(`${r.replayId}~${r.id}`)} />
+                    </td>
                     <th scope="row" className="ms-name">
                       <strong>{r.team}</strong> <span className="faint">vs {r.opponent}</span>
                       <div className="faint" style={{ fontSize: 11, fontWeight: 400 }}>{new Date(r.when).toLocaleDateString()}{r.title ? ` · ${r.title}` : ""}</div>
