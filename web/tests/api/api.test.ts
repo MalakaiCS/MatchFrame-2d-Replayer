@@ -445,3 +445,22 @@ describe("personal and team demo pages", () => {
     expect(ids(await owner.json("/api/replays?scope=personal", {}, 200))).toContain(replayId);
   }, 120_000);
 });
+
+describe("stats across demos", () => {
+  it("lists named teams from your demos and builds a team overview; outsiders see none of it", async () => {
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: `Harbour ${run}`, teamBName: `Rivals ${run}` } }, 200);
+    const hub = await owner.json("/api/stats", {}, 200);
+    const harbour = hub.teams.find((t: any) => t.name === `Harbour ${run}`);
+    expect(harbour).toMatchObject({ demos: 1 });
+    const team = await owner.json(`/api/stats/team?name=${encodeURIComponent(`harbour ${run}`)}`, {}, 200);
+    expect(team.name).toBe(`Harbour ${run}`);
+    expect(team.overall.rounds.p).toBe(manifest.rounds.length);
+    expect(team.opponents[0].name).toBe(`Rivals ${run}`);
+    expect(team.matches[0].replayId).toBe(replayId);
+    expect((await outsider.json("/api/stats", {}, 200)).teams.some((t: any) => t.name === `Harbour ${run}`)).toBe(false);
+    expect((await outsider.req(`/api/stats/team?name=${encodeURIComponent(`Harbour ${run}`)}`)).status).toBe(404);
+    expect((await anon.req("/api/stats")).status).toBe(401);
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: null, teamBName: null } }, 200);
+  });
+});
+

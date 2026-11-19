@@ -114,7 +114,7 @@ test("viewer: kill click lands on the recorded tick; keyboard and filters", asyn
   await page.screenshot({ path: path.join(OUT, "viewer-round13.png") });
 
   // Match stats page: per-player table for both teams, linked from the viewer header.
-  await page.getByRole("link", { name: "Stats", exact: true }).click();
+  await page.getByRole("link", { name: "Match stats", exact: true }).click();
   await page.waitForURL(/\/stats$/);
   await expect(page.locator(".ms-table")).toHaveCount(2);
   await expect(page.getByRole("columnheader", { name: "Rating 1.0" }).first()).toBeVisible();
