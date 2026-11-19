@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/access";
+import { q } from "@/lib/db";
 import { badRequest, json, notFound, route } from "@/lib/http";
 import { indexedReplays, teamDetail, teamKey } from "@/lib/statIndex";
 import { statReplays } from "@/lib/statQuery";
@@ -15,5 +16,7 @@ export const GET = route(async (req: Request) => {
   const { replays, pending } = await indexedReplays(await statReplays(user, url));
   const detail = teamDetail(replays, teamKey(name), map);
   if (!detail) throw notFound();
-  return json({ pending, ...detail });
+  // Opening a watched team's page marks its demos as seen.
+  const w = await q("update team_watches set last_seen_at = now() where user_id = $1 and team_key = $2 returning 1", [user.id, teamKey(name)]);
+  return json({ pending, watched: w.length > 0, ...detail });
 });

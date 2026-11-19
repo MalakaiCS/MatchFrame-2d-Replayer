@@ -15,7 +15,7 @@ interface WL { w: number; p: number }
 interface TeamItem { key: string; name: string; demos: number; wins: number; losses: number; draws: number; maps: string[]; lastPlayed: string }
 interface MapRecord { mapId: string; played: number; wins: number; losses: number; rounds: WL; ct: WL; t: WL; pistol: WL; opening: WL; clutch: WL }
 interface TeamDetail {
-  pending: number; name: string; demos: number; wins: number; losses: number; draws: number; overall: MapRecord; maps: MapRecord[];
+  pending: number; watched: boolean; name: string; demos: number; wins: number; losses: number; draws: number; overall: MapRecord; maps: MapRecord[];
   matches: { replayId: string; mapId: string | null; title: string | null; when: string; opponent: string; score: number; oppScore: number; result: "W" | "L" | "D"; rating: number | null }[];
   players: { key: string; name: string; maps: number; rounds: number; k: number; d: number; a: number; adr: number | null; kast: number; hs: number; rating: number; openingPct: number | null; clutches: string; multi: number }[];
   opponents: { name: string; wins: number; losses: number; demos: number }[];
@@ -57,7 +57,10 @@ export function SpacePicker({ teams, space, teamId, onChange }: { teams: TeamOpt
 export function StatsHub() {
   const router = useRouter();
   const { teams, space, teamId, qs } = useSpace();
-  const [data, setData] = useState<{ demos: number; withPlayerStats: number; unnamed: number; pending: number; teams: TeamItem[] } | null>(null);
+  const [data, setData] = useState<{
+    demos: number; withPlayerStats: number; unnamed: number; pending: number; teams: TeamItem[];
+    watched: { key: string; name: string; demos: number; newDemos: number }[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const qsKey = qs.toString();
@@ -100,6 +103,20 @@ export function StatsHub() {
           {data.unnamed ? ` · ${data.unnamed} with no team names (rename the teams in the replay to include them)` : ""}
         </p>
       ) : <p className="muted">Loading…</p>}
+      {data?.watched.length ? (
+        <section aria-label="Watched teams" style={{ marginBottom: 16 }}>
+          <h2 className="st-h2">Watching</h2>
+          <div className="st-grid">
+            {data.watched.map((w) => (
+              <Link key={w.key} className="card st-team" href={`/stats/team?${new URLSearchParams({ name: w.name, space, ...(space === "team" && teamId ? { teamId } : {}) })}`}>
+                <strong>{w.name} {w.newDemos ? <span className="badge badge-ok">{w.newDemos} new</span> : null}</strong>
+                <span className="faint" style={{ fontSize: 12 }}>{w.demos} demo{w.demos === 1 ? "" : "s"}</span>
+              </Link>
+            ))}
+          </div>
+          <h2 className="st-h2" style={{ marginTop: 16 }}>All teams</h2>
+        </section>
+      ) : null}
       {data && shown.length === 0 && !data.pending ? <div className="empty">No named teams in these demos yet.</div> : null}
       <div className="st-grid">
         {shown.map((t) => (
@@ -152,7 +169,9 @@ export function TeamOverview() {
       <p className="ms-eyebrow"><Link href={`/stats?${qsKey}`}>Stats</Link> · Team overview</p>
       <div className="ms-head">
         <h1 style={{ margin: 0 }}>{d?.name ?? name}</h1>
-        <div className="row">
+        <div className="row no-print">
+          {d ? <WatchButton name={d.name} watched={d.watched} /> : null}
+          <button type="button" className="btn" onClick={() => window.print()} title="Print or save this page as a PDF scouting report">Scouting report</button>
           <Link className="btn" href={`/stats/rounds?${new URLSearchParams({ team: d?.name ?? name, ...(map ? { map } : {}) })}&${qsKey}`}>Find {d?.name ?? name}&apos;s rounds</Link>
           <SpacePicker teams={teams} space={space} teamId={teamId} onChange={(s, id) => router.replace(link({ space: s, teamId: id }))} />
         </div>
@@ -177,6 +196,11 @@ export function TeamOverview() {
             <Kpi label="Pistols" value={rate(d.overall.pistol)} sub={frac(d.overall.pistol)} />
             <Kpi label="Opening duels" value={rate(d.overall.opening)} sub={frac(d.overall.opening)} />
             <Kpi label="Clutches" value={rate(d.overall.clutch)} sub={frac(d.overall.clutch)} />
+          </div>
+
+          <div className="st-two">
+            <TrendChart matches={d.matches} />
+            <Tendencies name={d.name} map={map} qs={qsKey} />
           </div>
 
           <section className="ms-table-wrap" aria-label="Record by map">
@@ -269,5 +293,105 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub: string 
       <strong className="mono">{value}</strong>
       <span className="faint mono" style={{ fontSize: 12 }}>{sub}</span>
     </div>
+  );
+}
+
+function WatchButton({ name, watched }: { name: string; watched: boolean }) {
+  const [on, setOn] = useState(watched);
+  useEffect(() => setOn(watched), [watched]);
+  async function toggle() {
+    if (on) await api(`/api/stats/watch?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+    else await api("/api/stats/watch", { method: "POST", json: { name } });
+    setOn(!on);
+  }
+  return (
+    <button type="button" className="btn" aria-pressed={on} onClick={toggle} title="Watched teams are listed first on Stats, with new demos counted">
+      {on ? "Watching" : "Watch team"}
+    </button>
+  );
+}
+
+/** Round difference per match (bars) and the team's average rating (line), oldest to newest. */
+function TrendChart({ matches }: { matches: TeamDetail["matches"] }) {
+  const ms = [...matches].reverse().slice(-30);
+  if (ms.length < 2) {
+    return <section className="card" aria-label="Trend"><h2 className="st-h2">Trend</h2><p className="faint" style={{ margin: 0 }}>Needs at least two maps.</p></section>;
+  }
+  const W = 520, H = 160, pad = 24;
+  const step = (W - pad * 2) / ms.length;
+  const maxDiff = Math.max(4, ...ms.map((m) => Math.abs(m.score - m.oppScore)));
+  const mid = H / 2;
+  const ratings = ms.map((m) => m.rating);
+  const rY = (r: number) => H - pad - ((Math.min(1.6, Math.max(0.6, r)) - 0.6) / 1.0) * (H - pad * 2);
+  const line = ratings.map((r, i) => (r === null ? null : [pad + i * step + step / 2, rY(r)] as const)).filter((p): p is readonly [number, number] => !!p);
+  return (
+    <section className="card" aria-label="Trend">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2 className="st-h2">Trend</h2>
+        <span className="faint" style={{ fontSize: 12 }}>Bars: round difference · Line: team rating (0.6–1.6)</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Last ${ms.length} maps: ${ms.map((m) => `${m.result} ${m.score}-${m.oppScore}`).join(", ")}`}>
+        <line x1={pad} x2={W - pad} y1={mid} y2={mid} stroke="var(--border-strong)" />
+        {ms.map((m, i) => {
+          const d = m.score - m.oppScore;
+          const h = (Math.abs(d) / maxDiff) * (mid - pad);
+          return (
+            <rect key={m.replayId} x={pad + i * step + (step - Math.min(step * 0.6, 36)) / 2} width={Math.min(step * 0.6, 36)} y={d >= 0 ? mid - h : mid} height={Math.max(1, h)} rx={2}
+              fill={d > 0 ? "var(--ok)" : d < 0 ? "var(--danger)" : "var(--text-faint)"} opacity={0.75}>
+              <title>{`${new Date(m.when).toLocaleDateString()} vs ${m.opponent}: ${m.score}-${m.oppScore}${m.rating !== null ? `, rating ${m.rating.toFixed(2)}` : ""}`}</title>
+            </rect>
+          );
+        })}
+        {line.length > 1 ? <polyline points={line.map((p) => p.join(",")).join(" ")} fill="none" stroke="var(--ct)" strokeWidth={2} /> : null}
+        {line.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={2.5} fill="var(--ct)" />)}
+      </svg>
+    </section>
+  );
+}
+
+interface TendencyData {
+  demos: number; pending: number;
+  tSide: { rounds: number; fast: number; execute: number; late: number; noPlant: number; siteA: number; siteB: number; plantWin: { n: number; of: number }; noPlantWin: { n: number; of: number }; avgPlantS: number | null };
+  ctSide: { rounds: number; retake: { n: number; of: number }; won: { n: number; of: number } };
+  economy: Record<"pistol" | "eco" | "half" | "full" | "antiEco", { n: number; of: number }>;
+  saves: { n: number; of: number }; opening: { n: number; of: number };
+}
+
+/** Playstyle summary from round tags across the team's demos. */
+function Tendencies({ name, map, qs }: { name: string; map: string; qs: string }) {
+  const [t, setT] = useState<TendencyData | null>(null);
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let off = false;
+    api<TendencyData>(`/api/stats/tendencies?${new URLSearchParams({ name, ...(map ? { map } : {}) })}&${qs}`).then((r) => { if (!off) setT(r); }).catch(() => {});
+    return () => { off = true; };
+  }, [name, map, qs, n]);
+  useEffect(() => {
+    if (!t?.pending) return;
+    const h = setTimeout(() => setN((x) => x + 1), 500);
+    return () => clearTimeout(h);
+  }, [t]);
+  const p = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)}%` : "—");
+  const r = (x: { n: number; of: number }) => (x.of ? `${Math.round((100 * x.n) / x.of)}% (${x.n}/${x.of})` : "—");
+  return (
+    <section className="card" aria-label="Tendencies">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2 className="st-h2">Tendencies</h2>
+        {t ? <span className="faint" style={{ fontSize: 12 }}>{t.demos} demos{t.pending ? `, adding ${t.pending}…` : ""}</span> : null}
+      </div>
+      {!t ? <p className="muted">Loading…</p> : (
+        <dl className="st-tend">
+          <div><dt>T: fast plant / execute / late / no plant</dt><dd>{p(t.tSide.fast, t.tSide.rounds)} · {p(t.tSide.execute, t.tSide.rounds)} · {p(t.tSide.late, t.tSide.rounds)} · {p(t.tSide.noPlant, t.tSide.rounds)}</dd></div>
+          <div><dt>T: plants at A / B</dt><dd>{p(t.tSide.siteA, t.tSide.siteA + t.tSide.siteB)} · {p(t.tSide.siteB, t.tSide.siteA + t.tSide.siteB)}{t.tSide.avgPlantS !== null ? ` · avg plant ${Math.floor(t.tSide.avgPlantS / 60)}:${String(t.tSide.avgPlantS % 60).padStart(2, "0")}` : ""}</dd></div>
+          <div><dt>T: win after planting</dt><dd>{r(t.tSide.plantWin)}</dd></div>
+          <div><dt>CT: rounds won / retakes won</dt><dd>{r(t.ctSide.won)} · {r(t.ctSide.retake)}</dd></div>
+          <div><dt>Pistol rounds won</dt><dd>{r(t.economy.pistol)}</dd></div>
+          <div><dt>Won on eco / half buy / full buy</dt><dd>{r(t.economy.eco)} · {r(t.economy.half)} · {r(t.economy.full)}</dd></div>
+          <div><dt>Anti-eco rounds won</dt><dd>{r(t.economy.antiEco)}</dd></div>
+          <div><dt>Saves in lost rounds</dt><dd>{r(t.saves)}</dd></div>
+          <div><dt>Opening duels won</dt><dd>{r(t.opening)}</dd></div>
+        </dl>
+      )}
+    </section>
   );
 }

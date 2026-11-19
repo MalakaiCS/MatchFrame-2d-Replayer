@@ -530,3 +530,26 @@ describe("round search", () => {
   });
 });
 
+describe("watchlist and tendencies", () => {
+  it("watching a team lists it with new demos until its page is opened; tendencies summarise its rounds", async () => {
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: `Watch ${run}`, teamBName: `Other ${run}` } }, 200);
+    await owner.json("/api/stats/watch", { method: "POST", json: { name: `Watch ${run}` } }, 201);
+    // Pretend we last looked before the demo was uploaded.
+    await owner.json("/api/stats/watch", {}, 200);
+    const hub = await owner.json("/api/stats", {}, 200);
+    const w = hub.watched.find((x: any) => x.name === `Watch ${run}`);
+    expect(w).toMatchObject({ demos: 1 });
+    const team = await owner.json(`/api/stats/team?name=${encodeURIComponent(`Watch ${run}`)}`, {}, 200);
+    expect(team.watched).toBe(true);
+    expect((await owner.json("/api/stats", {}, 200)).watched.find((x: any) => x.name === `Watch ${run}`).newDemos).toBe(0);
+    const t = await owner.json(`/api/stats/tendencies?name=${encodeURIComponent(`Watch ${run}`)}`, {}, 200);
+    expect(t.demos).toBe(1);
+    expect(t.tSide.rounds + t.ctSide.rounds).toBe(manifest.rounds.length);
+    expect(t.economy.pistol.of).toBe(2);
+    expect((await outsider.req(`/api/stats/tendencies?name=${encodeURIComponent(`Watch ${run}`)}`)).status).toBe(404);
+    await owner.json(`/api/stats/watch?name=${encodeURIComponent(`Watch ${run}`)}`, { method: "DELETE" }, 200);
+    expect((await owner.json("/api/stats", {}, 200)).watched.some((x: any) => x.name === `Watch ${run}`)).toBe(false);
+    await owner.json(`/api/replays/${replayId}`, { method: "PATCH", json: { teamAName: null, teamBName: null } }, 200);
+  });
+});
+

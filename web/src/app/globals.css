@@ -574,3 +574,20 @@ li[data-selected="true"] > .ins-cluster { border-color: var(--border-strong); ba
 .rs-tags { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
 .rs-tagcell { display: flex; gap: 4px; flex-wrap: wrap; font-weight: 400 !important; }
 .rs-table td, .rs-table th { vertical-align: middle; }
+
+/* trends, tendencies, scouting report */
+.st-h2 { margin: 0 0 10px; font-size: 16px; }
+.st-tend { display: grid; gap: 8px; margin: 0; }
+.st-tend > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; font-size: 13px; border-bottom: 1px solid rgba(38, 50, 65, 0.6); padding-bottom: 6px; }
+.st-tend dt { color: var(--text-dim); }
+.st-tend dd { margin: 0; font-family: var(--mono); text-align: right; }
+@media print {
+  body { background: #fff; color: #111; }
+  .topbar, .no-print, .ms-filters, .ins, .ins-controls, nav { display: none !important; }
+  .card, .ms-table-wrap { background: #fff !important; border-color: #ccc !important; break-inside: avoid; }
+  .ms-table thead th { background: #f2f2f2 !important; color: #333 !important; }
+  .ms-table th, .ms-table td, .st-tend dt, .faint, .muted, .st-kpi strong { color: #111 !important; }
+  a { color: #111; text-decoration: none; }
+  .page { max-width: none !important; padding: 0 !important; }
+}
+.st-two { align-items: start; }
