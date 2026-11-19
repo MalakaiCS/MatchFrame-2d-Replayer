@@ -40,14 +40,16 @@
      - `STORAGE_DRIVER=s3`
      - `S3_BUCKET`, `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT` (the endpoint browsers can reach), `S3_REGION`
      - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
-     - `MAX_DEMO_BYTES=536870912`
+     - `MAX_DEMO_BYTES=1073741824` (1 GiB; BO3 archives are 300–600 MB)
      - `ALLOW_SIGNUP=1` (or `0` for invite-only)
      - Leave `MF_ALLOW_SYNTHETIC` unset.
    - Health check: `/api/health` (already in `railway.json`).
 4. **Add the `worker` service** from the same repo. Settings:
    - Config file path: `worker/railway.json`.
-   - Variables: `DATABASE_URL`, the same `STORAGE_DRIVER`/`S3_*`/`AWS_*` values, and `MAX_DEMO_BYTES`.
-   - Optional tuning: `WORKER_PARSE_MEMORY_BYTES` (set below the service memory limit, for example 6 GiB on an 8 GiB service), `WORKER_MAX_TMP_BYTES`.
+   - Variables: `DATABASE_URL`, the same `STORAGE_DRIVER`/`S3_*`/`AWS_*` values, and `MAX_DEMO_BYTES=1073741824`.
+   - `WORKER_PARSE_MEMORY_BYTES=0`: rely on the service memory limit. The parser's virtual address space can exceed its real use.
+   - `WORKER_RECORDED_RESERVE=0` (magazine-only ammo) needs **at least 4 GB RAM**; peak on a 548 MB demo was 2.3 GiB. `WORKER_RECORDED_RESERVE=1` (reserve shown like EDGE) needs about **12 GB RAM**.
+   - Optional: `MAX_EXTRACTED_DEMO_BYTES` (default 1.5 GiB), `WORKER_MAX_TMP_BYTES` (default 4 GiB of temporary disk).
    - **Do not generate a domain** for the worker.
 5. **Deploy** both services. The web container runs `scripts/migrate.mjs`, which is idempotent and advisory-locked, before starting.
 6. **Custom domain**: in `web` → Settings → Networking, add `2d.matchframe.tv`. Railway shows the DNS records to create, typically a `CNAME` for `2d` pointing at the Railway target, and possibly a `TXT` verification record. Create exactly those records at the DNS provider for `matchframe.tv`. DNS names are case-insensitive; the product name keeps the casing "Matchframe2D Replayer".
