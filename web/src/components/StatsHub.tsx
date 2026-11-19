@@ -94,6 +94,7 @@ export function StatsHub() {
         <input id="team-search" className="input" placeholder="Search teams" value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 300 }} />
         <SpacePicker teams={teams} space={space} teamId={teamId} onChange={go} />
         <Link className="btn" href={`/stats/rounds?${qsKey}`}>Find rounds</Link>
+        <Link className="btn" href="/stats/me">My stats</Link>
       </div>
       {error ? <p className="alert alert-err" role="alert">{error}</p> : null}
       {data ? (

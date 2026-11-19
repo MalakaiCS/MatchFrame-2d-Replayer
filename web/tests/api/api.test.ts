@@ -578,3 +578,23 @@ describe("tactic boards", () => {
   });
 });
 
+describe("my stats", () => {
+  it("links Steam accounts and shows your stats from demos you can open", async () => {
+    expect((await outsider.json("/api/stats/me", {}, 200)).linked).toEqual([]);
+    expect((await owner.req("/api/me/steam", { method: "POST", json: { steam: "https://steamcommunity.com/id/vanity" } })).status).toBe(400);
+    // Synthetic demos give team A's first player SteamID 76561198000000001.
+    await owner.json("/api/me/steam", { method: "POST", json: { steam: "https://steamcommunity.com/profiles/76561198000000001" } }, 201);
+    expect((await owner.json("/api/me/steam", {}, 200)).steamIds).toEqual(["76561198000000001"]);
+    let me = await owner.json("/api/stats/me", {}, 200);
+    for (let i = 0; i < 20 && me.pending; i++) me = await owner.json("/api/stats/me", {}, 200);
+    expect(me.maps).toBeGreaterThan(0);
+    expect(me.overall.rounds).toBeGreaterThan(0);
+    expect(me.matches[0]).toHaveProperty("rating");
+    // An outsider linking the same ID sees only their own demos (none).
+    await outsider.json("/api/me/steam", { method: "POST", json: { steam: "76561198000000001" } }, 201);
+    expect((await outsider.json("/api/stats/me", {}, 200)).maps).toBe(0);
+    await owner.json("/api/me/steam?steamId=76561198000000001", { method: "DELETE" }, 200);
+    expect((await owner.json("/api/stats/me", {}, 200)).linked).toEqual([]);
+  });
+});
+
