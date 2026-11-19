@@ -606,7 +606,8 @@ function Workspace({
   return (
     <div className="ws ws-edge">
       <header className="ws-header">
-        <Link href="/replays" className="btn btn-ghost btn-sm" aria-label="Back to library">‹ Back</Link>
+        <Link href={data.replay.teamId && data.replay.visibility === "team" ? `/replays/team?team=${encodeURIComponent(data.replay.teamId)}` : "/replays"}
+          className="btn btn-ghost btn-sm" aria-label={data.replay.teamId && data.replay.visibility === "team" ? "Back to team demos" : "Back to personal demos"}>‹ Back</Link>
         <span className="ws-map">{mapName(manifest.map.id)}</span>
         {data.series.length > 1 ? (
           <select className="select btn-sm" style={{ height: 28 }} aria-label="Series map" value={id}

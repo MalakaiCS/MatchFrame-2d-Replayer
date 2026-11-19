@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { PlanNotice } from "./BillingPage";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, putWithProgress } from "./api";
 import { IconUpload } from "./icons";
@@ -28,6 +28,12 @@ async function sniff(file: File): Promise<string | null> {
 
 export function UploadFlow() {
   const router = useRouter();
+  const search = useSearchParams();
+  // Where the demo goes: "" = Personal (only you), otherwise a team id (everyone on that team).
+  const [dest, setDest] = useState(() => {
+    const to = search.get("to");
+    return to && to !== "personal" ? to : "";
+  });
   const [file, setFile] = useState<File | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [progress, setProgress] = useState(0);
@@ -143,11 +149,14 @@ export function UploadFlow() {
               <input className="input" id="title" name="title" maxLength={200} placeholder="e.g. Scrim vs Harbour, Mirage" />
             </div>
             <div className="field">
-              <label htmlFor="teamId">Team</label>
-              <select className="select" id="teamId" name="teamId" defaultValue="">
-                <option value="">Private (only me)</option>
+              <label htmlFor="teamId">Upload to</label>
+              <select className="select" id="teamId" name="teamId" value={dest} onChange={(e) => setDest(e.target.value)}>
+                <option value="">Personal (only me)</option>
                 {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
+              <span className="faint" style={{ fontSize: 12 }}>
+                {dest ? `Shows on the Team page for everyone in ${teams.find((t) => t.id === dest)?.name ?? "the team"}.` : "Shows on your Personal page. Only you can see it."}
+              </span>
             </div>
           </div>
           <details>
@@ -180,8 +189,8 @@ export function UploadFlow() {
 
       {stage === "processing" ? (
         <div className="card" aria-live="polite">
-          <p style={{ marginTop: 0 }}>Parsing the demo. Full matches usually take under a minute. You can leave this page; the replay will appear in your library.</p>
-          <Link className="btn" href="/replays">Go to library</Link>
+          <p style={{ marginTop: 0 }}>Parsing the demo. Full matches usually take under a minute. You can leave this page; the replay will appear in {dest ? "the team's demos" : "your personal demos"}.</p>
+          <Link className="btn" href={dest ? `/replays/team?team=${encodeURIComponent(dest)}` : "/replays"}>{dest ? "Go to team demos" : "Go to personal demos"}</Link>
         </div>
       ) : null}
 

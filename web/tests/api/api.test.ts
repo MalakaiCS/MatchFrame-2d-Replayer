@@ -421,3 +421,27 @@ describe("website and login gate", () => {
     expect((await owner.req("/replays")).status).toBe(200);
   });
 });
+
+describe("personal and team demo pages", () => {
+  it("personal lists your own non-team uploads; team lists what is uploaded to or shared with that team", async () => {
+    const t2 = await mate.json("/api/teams", { method: "POST", json: { name: `Mate team ${run}` } }, 201);
+    const { done } = await upload(mate, synthetic({ map: "de_dust2", winners: "AB" }), "team.dem", { teamId: t2.id });
+    await waitReady(mate, done.replayId);
+    const { done: own } = await upload(mate, synthetic({ map: "de_dust2", winners: "BA" }), "mine.dem");
+    await waitReady(mate, own.replayId);
+    const ids = (r: any) => r.replays.map((x: any) => x.id);
+
+    const matePersonal = ids(await mate.json("/api/replays?scope=personal", {}, 200));
+    expect(matePersonal).toContain(own.replayId);
+    expect(matePersonal).not.toContain(done.replayId);
+    const mateTeam = ids(await mate.json(`/api/replays?scope=team&teamId=${t2.id}`, {}, 200));
+    expect(mateTeam).toContain(done.replayId);
+    expect(mateTeam).not.toContain(own.replayId);
+    // The owner's replay is shared with the first team, so it is in that team's page for the mate.
+    expect(ids(await mate.json(`/api/replays?scope=team&teamId=${teamId}`, {}, 200))).toContain(replayId);
+    expect(ids(await mate.json("/api/replays?scope=personal", {}, 200))).not.toContain(replayId);
+    // Someone outside the team sees nothing of it, even when asking for the team id.
+    expect(ids(await outsider.json(`/api/replays?scope=team&teamId=${t2.id}`, {}, 200))).toEqual([]);
+    expect(ids(await owner.json("/api/replays?scope=personal", {}, 200))).toContain(replayId);
+  }, 120_000);
+});

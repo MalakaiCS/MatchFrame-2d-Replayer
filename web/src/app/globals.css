@@ -461,3 +461,10 @@ dialog.modal h2 { margin: 0 0 12px; font-size: 17px; }
 .plan-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
 .plan-teams { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
 .plan-team-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+
+/* ---------- Personal / Team demo spaces ---------- */
+.space-switch { display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-sunken); }
+.space-switch a { padding: 6px 16px; border-radius: 6px; text-decoration: none; color: var(--text-dim); font-weight: 600; font-size: 14px; }
+.space-switch a:hover { color: var(--text); }
+.space-switch a[aria-current="page"] { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }

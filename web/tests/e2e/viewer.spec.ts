@@ -34,7 +34,10 @@ test("sign up, upload and process a demo", async ({ page }) => {
   await page.getByLabel("Password").fill("correct-horse-battery");
   await page.getByRole("button", { name: "Create account" }).click();
   await page.waitForURL(/\/replays/);
-  await expect(page.getByRole("heading", { name: "Replay library" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Personal demos" })).toBeVisible();
+  // The Team page explains how to start when you are not in a team yet.
+  await page.locator(".space-switch").getByRole("link", { name: "Team" }).click();
+  await expect(page.getByText("You are not in a team yet.")).toBeVisible();
 
   await page.goto(`${BASE}/replays/new`);
   await page.getByTestId("file-input").setInputFiles(fixture);

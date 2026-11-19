@@ -5,7 +5,8 @@ import { authClient } from "./auth-client";
 import { Wordmark } from "./icons";
 
 const NAV = [
-  { href: "/replays", label: "Library" },
+  { href: "/replays", label: "Personal" },
+  { href: "/replays/team", label: "Team" },
   { href: "/replays/new", label: "Upload" },
   { href: "/teams", label: "Teams" },
   { href: "/billing", label: "Plans" },
