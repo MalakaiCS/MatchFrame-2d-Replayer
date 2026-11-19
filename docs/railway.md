@@ -6,8 +6,8 @@
 
 | Service | Source | Public? | Notes |
 | --- | --- | --- | --- |
-| `web` | this repo, `web/Dockerfile` (config: `web/railway.json`) | **yes**: custom domain `2d.matchframe.tv` | Next.js app and API. Runs migrations at start |
-| `worker` | this repo, `worker/Dockerfile` (config: `worker/railway.json`) | **no**: no domain, no TCP proxy | Awpy parser, job loop, maintenance. Scale replicas for throughput |
+| `web` | this repo, `web/Dockerfile` | **yes**: custom domain `2d.matchframe.tv` | Next.js app and API. Runs migrations at start |
+| `worker` | this repo, `worker/Dockerfile` | **no**: no domain, no TCP proxy | Awpy parser, job loop, maintenance. Scale replicas for throughput |
 | `Postgres` | Railway PostgreSQL | **no** public TCP proxy | Reached over Railway's private network |
 | Object storage | A Railway bucket, or any S3-compatible bucket (Cloudflare R2, AWS S3) | **private** bucket | Browsers upload with short-lived presigned PUT URLs. Reads always go through `web` |
 
@@ -32,7 +32,9 @@
 
    - Add a lifecycle rule that aborts incomplete multipart uploads after 1 day. This is a safety net; uploads use a single PUT.
 3. **Add the `web` service** from the GitHub repo. Settings:
-   - Root directory: `/` (repo root). Config file path: `web/railway.json`.
+   - Root Directory: empty (repo root). Railway's Config as Code (`railway.json`) is deprecated and is not used.
+   - Variable `RAILWAY_DOCKERFILE_PATH=web/Dockerfile`. Without it, Railway's automatic builder (Railpack) fails with "could not determine how to build the app".
+   - Settings → Deploy: Healthcheck Path `/api/health`; Restart Policy "On Failure".
    - Variables:
      - `DATABASE_URL=${{Postgres.DATABASE_URL}}` (the private URL)
      - `APP_ORIGIN=https://2d.matchframe.tv`
@@ -43,9 +45,9 @@
      - `MAX_DEMO_BYTES=1073741824` (1 GiB; BO3 archives are 300–600 MB)
      - `ALLOW_SIGNUP=1` (or `0` for invite-only)
      - Leave `MF_ALLOW_SYNTHETIC` unset.
-   - Health check: `/api/health` (already in `railway.json`).
 4. **Add the `worker` service** from the same repo. Settings:
-   - Config file path: `worker/railway.json`.
+   - Root Directory: empty. Variable `RAILWAY_DOCKERFILE_PATH=worker/Dockerfile`.
+   - Settings → Deploy: Restart Policy "Always"; no health check.
    - Variables: `DATABASE_URL`, the same `STORAGE_DRIVER`/`S3_*`/`AWS_*` values, and `MAX_DEMO_BYTES=1073741824`.
    - `WORKER_PARSE_MEMORY_BYTES=0`: rely on the service memory limit. The parser's virtual address space can exceed its real use.
    - `WORKER_RECORDED_RESERVE=0` (magazine-only ammo) needs **at least 4 GB RAM**; peak on a 548 MB demo was 2.3 GiB. `WORKER_RECORDED_RESERVE=1` (reserve shown like EDGE) needs about **12 GB RAM**.
