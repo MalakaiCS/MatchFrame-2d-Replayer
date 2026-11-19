@@ -35,6 +35,45 @@ export interface DrawOptions {
   showUtility: boolean;
   showDeaths: boolean;
   strokes?: Stroke[];
+  /** Panel origin (CSS px) when several floors are drawn side by side. */
+  offsetX?: number;
+  /** Side-by-side mode: draw only what is on `floor` (no hollow off-floor markers). */
+  hideOffFloor?: boolean;
+  /** Caption drawn at the top of the panel (e.g. "Upper", "Lower"). */
+  panelLabel?: string;
+}
+
+export interface SplitOptions extends Omit<DrawOptions, "floor" | "radar" | "offsetX" | "hideOffFloor" | "panelLabel"> {
+  /** Floors to draw side by side, left to right, each with its own radar image. */
+  floors: number[];
+  radars: (HTMLImageElement | null)[];
+}
+
+/** Width of one panel when `n` floors are shown side by side. */
+export function panelWidth(width: number, n: number): number {
+  return width / Math.max(1, n);
+}
+
+/** Every floor of a multi-level map at once: one panel per floor, sharing pan and zoom. */
+export function drawSplit(ctx: CanvasRenderingContext2D, o: SplitOptions) {
+  ctx.setTransform(o.dpr, 0, 0, o.dpr, 0, 0);
+  ctx.clearRect(0, 0, o.width, o.height);
+  const pw = panelWidth(o.width, o.floors.length);
+  o.floors.forEach((f, i) => {
+    drawFrame(ctx, {
+      ...o, width: pw, offsetX: i * pw, floor: f, radar: o.radars[i] ?? null, hideOffFloor: true,
+      panelLabel: o.map.floors[f]?.label,
+    });
+  });
+  ctx.setTransform(o.dpr, 0, 0, o.dpr, 0, 0);
+  ctx.strokeStyle = "rgba(154, 168, 184, 0.35)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < o.floors.length; i++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.round(i * pw) + 0.5, 0);
+    ctx.lineTo(Math.round(i * pw) + 0.5, o.height);
+    ctx.stroke();
+  }
 }
 
 export const COLORS = {
@@ -53,7 +92,11 @@ export const COLORS = {
 
 export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
   const { map, viewport: v, width: w, height: h, dpr } = o;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, dpr * (o.offsetX ?? 0), 0);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, w, h);
+  ctx.clip();
   ctx.clearRect(0, 0, w, h);
   const s = fitScale(map.imageSize, w, h) * v.zoom; // screen px per image px
   const toScreen = (x: number, y: number) => {
@@ -93,6 +136,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
       const e = ef.effect;
       const [cx, cy] = toScreen(e.position.x, e.position.y);
       const dim = !onFloor(floorOfZ(e.position.z));
+      if (dim && o.hideOffFloor) continue;
       ctx.globalAlpha = dim ? 0.3 : 1;
       if (e.kind === "smoke") {
         const r = units(e.radius);
@@ -152,6 +196,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
   // --- grenades in flight
   if (o.showUtility) {
     for (const g of o.frame.grenades) {
+      if (o.hideOffFloor && !onFloor(floorOfZ(g.position.z))) continue;
       const thrower = g.throwerId ? o.players.get(g.throwerId) : undefined;
       const col = thrower ? COLORS[thrower.side] : "#ccc";
       if (o.showTrails && g.trail.length > 1) {
@@ -185,6 +230,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
   // --- death markers
   if (o.showDeaths) {
     for (const d of o.frame.deaths) {
+      if (o.hideOffFloor && !onFloor(floorOfZ(d.position.z))) continue;
       const pl = o.players.get(d.playerId);
       const [dx, dy] = toScreen(d.position.x, d.position.y);
       const col = pl ? COLORS[pl.side] : "#999";
@@ -202,7 +248,8 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
 
   // --- bomb on the ground
   const b = o.frame.bomb;
-  if (b.position && (b.state === "dropped" || b.state === "planted" || b.state === "defusing" || b.state === "defused" || b.state === "exploded")) {
+  const bombHere = !b.position || !o.hideOffFloor || onFloor(floorOfZ(b.position.z));
+  if (bombHere && b.position && (b.state === "dropped" || b.state === "planted" || b.state === "defusing" || b.state === "defused" || b.state === "exploded")) {
     const [bx, by] = toScreen(b.position.x, b.position.y);
     ctx.fillStyle = b.state === "defused" ? COLORS.CT : COLORS.bomb;
     ctx.strokeStyle = "#0b1016";
@@ -235,6 +282,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
     const [px, py] = toScreen(p.x, p.y);
     const col = COLORS[info.side];
     const off = !onFloor(p.floor);
+    if (off && o.hideOffFloor) continue;
     const r = 7;
     ctx.globalAlpha = off ? 0.45 : 1;
     // view direction
@@ -298,7 +346,17 @@ export function drawFrame(ctx: CanvasRenderingContext2D, o: DrawOptions) {
     ctx.setLineDash([]);
     ctx.stroke();
   }
+
+  if (o.panelLabel) {
+    ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "rgba(230, 237, 244, 0.85)";
+    ctx.fillText(`${o.panelLabel} floor`, w / 2, 10);
+  }
+  ctx.restore();
 }
+
 function label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, size: number) {
   ctx.font = `600 ${size}px ui-sans-serif, system-ui, sans-serif`;
   ctx.textAlign = "center";
@@ -322,10 +380,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 /** Hit-test players at a screen point (CSS pixels). */
 export function playerAtPoint(o: Omit<DrawOptions, "dpr" | "radar">, sx: number, sy: number): string | null {
+  const only = o.hideOffFloor && typeof o.floor === "number" ? o.floor : null;
   let best: string | null = null;
   let bestD = 14;
   for (const p of o.frame.players) {
     if (!p.visible || !p.alive) continue;
+    if (only !== null && p.floor !== only) continue;
     const [ix, iy] = worldToImage(o.map, p.x, p.y);
     const [px, py] = imageToScreen(o.viewport, o.map.imageSize, o.width, o.height, ix, iy);
     const d = Math.hypot(px - sx, py - sy);

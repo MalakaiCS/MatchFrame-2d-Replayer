@@ -126,7 +126,7 @@ test("share link opens the selected moment in a clean session; revocation blocks
   await anon.goto(link);
   await expect(anon.getByText("Read-only link")).toBeVisible({ timeout: 15_000 });
   await expect(anon.getByRole("button", { name: /^Round 7/ })).toHaveAttribute("aria-current", "true");
-  await expect(anon.locator("#round-scrubber")).toHaveAttribute("aria-valuetext", /0:30 into round 7/);
+  await expect(anon.locator("#round-scrubber")).toHaveAttribute("aria-valuetext", /0:15 into round 7/);
   await expect(anon.getByRole("tab", { name: /Notes/ })).toHaveCount(0);
   await anon.screenshot({ path: path.join(OUT, "share-view.png") });
 

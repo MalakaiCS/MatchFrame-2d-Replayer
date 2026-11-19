@@ -6,7 +6,7 @@ import type { Manifest, PlayerInfo, RoundSummary, Side } from "@/shared/contract
 import { tickToRoundMs } from "@/shared/contract";
 import type { AudioSync } from "@/viewer/audioSync";
 import { clockAt } from "@/viewer/clock";
-import { drawFrame, playerAtPoint, type Stroke } from "@/viewer/draw";
+import { drawFrame, drawSplit, panelWidth, playerAtPoint, type Stroke } from "@/viewer/draw";
 import { filterRounds, filtersFromParam, filtersToParam, type RoundFilters } from "@/viewer/filters";
 import { getMapDef, mapName, screenToImage, type Viewport, worldToImage, zoomAt } from "@/viewer/maps";
 import { frameAt, inventoryAt, nextEvent, type Frame, type RoundIndex } from "@/viewer/playback";
@@ -132,9 +132,11 @@ function Workspace({
   const [uiTick, setUiTick] = useState(initial.tick);
   const [selected, setSelected] = useState<string | null>(null);
   const [follow, setFollow] = useState(false);
-  const [floor, setFloor] = useState<"auto" | number>("auto");
+  // Multi-level maps default to both floors side by side; "auto" overlays them; a number shows one floor.
+  const [floor, setFloor] = useState<"split" | "auto" | number>(() => (map.floors.length > 1 ? "split" : "auto"));
   const [autoplay, setAutoplay] = useState(true);
-  const [skipFreeze, setSkipFreeze] = useState(false);
+  // Freeze time is skipped by default and left off the timeline.
+  const [skipFreeze, setSkipFreeze] = useState(true);
   const [toggles, setToggles] = useState({ names: true, trails: true, utility: true, deaths: true });
   const [dockTab, setDockTab] = useState<DockTab>("players");
   const [shareOpen, setShareOpen] = useState(false);
@@ -193,7 +195,8 @@ function Workspace({
         setIndex(idx);
         const want = pendingTick.current ?? (optsRef.current.skipFreeze && round.freezeEndTick ? round.freezeEndTick : round.startTick);
         pendingTick.current = null;
-        tickRef.current = Math.min(Math.max(want, round.startTick), round.endTick - 1);
+        const lo = optsRef.current.skipFreeze && round.freezeEndTick !== null ? round.freezeEndTick : round.startTick;
+        tickRef.current = Math.min(Math.max(want, lo), round.endTick - 1);
         setUiTick(tickRef.current);
         dirty.current = true;
         const i = manifest.rounds.findIndex((r) => r.id === roundId);
@@ -232,10 +235,21 @@ function Workspace({
     return () => clearTimeout(t);
   }, [roundId, playing, uiTick, filters, syncUrl]);
 
+  // Turning freeze-skip on while inside freeze time jumps to freeze end.
+  useEffect(() => {
+    const r = roundRef.current;
+    if (skipFreeze && r.freezeEndTick !== null && tickRef.current < r.freezeEndTick) {
+      tickRef.current = r.freezeEndTick;
+      setUiTick(tickRef.current);
+      dirty.current = true;
+    }
+  }, [skipFreeze]);
+
   // ---- control actions
   const seek = useCallback((t: number) => {
     const r = roundRef.current;
-    tickRef.current = Math.min(Math.max(t, r.startTick), r.endTick - 1);
+    const lo = optsRef.current.skipFreeze && r.freezeEndTick !== null ? r.freezeEndTick : r.startTick;
+    tickRef.current = Math.min(Math.max(t, lo), r.endTick - 1);
     setUiTick(tickRef.current);
     dirty.current = true;
   }, []);
@@ -280,7 +294,8 @@ function Workspace({
   const zoom = useCallback((factor: number) => {
     const el = wrapRef.current;
     if (!el) return;
-    viewport.current = zoomAt(viewport.current, map.imageSize, el.clientWidth, el.clientHeight, el.clientWidth / 2, el.clientHeight / 2, factor);
+    const pw = panelWidth(el.clientWidth, optsRef.current.floor === "split" ? map.floors.length : 1);
+    viewport.current = zoomAt(viewport.current, map.imageSize, pw, el.clientHeight, pw / 2, el.clientHeight / 2, factor);
     dirty.current = true;
   }, [map.imageSize]);
   const resetView = useCallback(() => {
@@ -309,11 +324,11 @@ function Workspace({
         case "]": stepRound(1); break;
         case ",": case "<": changeSpeed(-1); break;
         case ".": case ">": changeSpeed(1); break;
-        case "Home": seek(r.startTick); break;
+        case "Home": seek(r.startTick); break; // clamped to freeze end when skipping
         case "End": seek(r.endTick - 1); break;
         case "f": case "F": if (r.freezeEndTick !== null) seek(r.freezeEndTick); break;
         case "v": case "V":
-          if (map.floors.length > 1) setFloor((f) => (f === "auto" ? 0 : f + 1 >= map.floors.length ? "auto" : f + 1));
+          if (map.floors.length > 1) setFloor((f) => (f === "split" ? "auto" : f === "auto" ? 0 : f + 1 >= map.floors.length ? "split" : f + 1));
           break;
         case "+": case "=": zoom(1.25); break;
         case "-": case "_": zoom(0.8); break;
@@ -377,14 +392,18 @@ function Workspace({
             viewport.current = { ...viewport.current, cx: ix, cy: iy, zoom: Math.max(viewport.current.zoom, 1.6) };
           }
         }
-        const floorShown = o.floor === "auto" ? "auto" : o.floor;
         const ctx = canvas.getContext("2d")!;
-        drawFrame(ctx, {
+        const common = {
           map, viewport: viewport.current, width: w, height: h, dpr, frame, players: playersRef.current, selected: o.selected,
-          floor: floorShown, radar: radarImgs.current.get(o.floor === "auto" ? 0 : o.floor) ?? null,
           showNames: o.toggles.names, showTrails: o.toggles.trails, showUtility: o.toggles.utility, showDeaths: o.toggles.deaths,
           strokes: strokes.current.get(r.id),
-        });
+        };
+        if (o.floor === "split") {
+          const floors = map.floors.map((_, i) => i);
+          drawSplit(ctx, { ...common, floors, radars: floors.map((i) => radarImgs.current.get(i) ?? null) });
+        } else {
+          drawFrame(ctx, { ...common, floor: o.floor, radar: radarImgs.current.get(o.floor === "auto" ? 0 : o.floor) ?? null });
+        }
         lastFrame.current = frame;
         dirty.current = playingRef.current;
       }
@@ -413,10 +432,18 @@ function Workspace({
   // ---- pointer: pan, wheel zoom, click to select
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const drawing = useRef<Stroke | null>(null);
-  const toImage = (e: React.PointerEvent): [number, number] => {
+  /** Panel under a screen point: in side-by-side mode each floor has its own panel with a shared viewport. */
+  const panelAt = (clientX: number) => {
     const el = wrapRef.current!;
     const rect = el.getBoundingClientRect();
-    return screenToImage(viewport.current, map.imageSize, el.clientWidth, el.clientHeight, e.clientX - rect.left, e.clientY - rect.top);
+    const n = floor === "split" ? map.floors.length : 1;
+    const pw = panelWidth(el.clientWidth, n);
+    const i = Math.min(n - 1, Math.max(0, Math.floor((clientX - rect.left) / pw)));
+    return { pw, h: el.clientHeight, x0: rect.left + i * pw, y0: rect.top, floorIdx: floor === "split" ? i : null };
+  };
+  const toImage = (e: React.PointerEvent): [number, number] => {
+    const g = panelAt(e.clientX);
+    return screenToImage(viewport.current, map.imageSize, g.pw, g.h, e.clientX - g.x0, e.clientY - g.y0);
   };
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -446,7 +473,7 @@ function Workspace({
     d.moved = true;
     d.x = e.clientX;
     d.y = e.clientY;
-    const s = (Math.min(el.clientWidth, el.clientHeight) / map.imageSize) * viewport.current.zoom;
+    const s = (Math.min(panelAt(e.clientX).pw, el.clientHeight) / map.imageSize) * viewport.current.zoom;
     viewport.current = { ...viewport.current, cx: viewport.current.cx - dx / s, cy: viewport.current.cy - dy / s };
     setFollow(false);
     dirty.current = true;
@@ -461,11 +488,12 @@ function Workspace({
     drag.current = null;
     const el = wrapRef.current;
     if (!d || d.moved || !el || !lastFrame.current) return;
-    const rect = el.getBoundingClientRect();
+    const g = panelAt(e.clientX);
     const hit = playerAtPoint({
-      map, viewport: viewport.current, width: el.clientWidth, height: el.clientHeight, frame: lastFrame.current, players,
-      selected, floor, showNames: true, showTrails: true, showUtility: true, showDeaths: true,
-    }, e.clientX - rect.left, e.clientY - rect.top);
+      map, viewport: viewport.current, width: g.pw, height: g.h, frame: lastFrame.current, players,
+      selected, floor: g.floorIdx ?? (floor === "split" ? "auto" : floor), hideOffFloor: g.floorIdx !== null,
+      showNames: true, showTrails: true, showUtility: true, showDeaths: true,
+    }, e.clientX - g.x0, e.clientY - g.y0);
     setSelected(hit);
     if (!hit) setFollow(false);
   };
@@ -475,12 +503,15 @@ function Workspace({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
-      viewport.current = zoomAt(viewport.current, map.imageSize, el.clientWidth, el.clientHeight, e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+      const n = optsRef.current.floor === "split" ? map.floors.length : 1;
+      const pw = panelWidth(el.clientWidth, n);
+      const i = Math.min(n - 1, Math.max(0, Math.floor((e.clientX - rect.left) / pw)));
+      viewport.current = zoomAt(viewport.current, map.imageSize, pw, el.clientHeight, e.clientX - rect.left - i * pw, e.clientY - rect.top, e.deltaY < 0 ? 1.15 : 1 / 1.15);
       dirty.current = true;
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [map.imageSize]);
+  }, [map.imageSize, map.floors.length]);
 
   const registerSync = useCallback((tid: string, s: AudioSync | null) => {
     if (s) syncs.current.set(tid, s);
@@ -493,6 +524,8 @@ function Workspace({
   const frameNow = index ? frameAt(index, uiTick) : null;
   const inventory = payload ? inventoryAt(payload, uiTick) : new Map<string, string[]>();
   const roundMs = tickToRoundMs(Math.round(uiTick), round, manifest.tickIntervalMs);
+  const timelineFrom = skipFreeze && round.freezeEndTick !== null ? round.freezeEndTick : round.startTick;
+  const shownMs = Math.max(0, Math.round((uiTick - timelineFrom) * manifest.tickIntervalMs));
   const scoreBefore = round.scoreBefore;
   const roundBookmarks = review.bookmarks.filter((b) => b.roundId === round.id && b.status !== "unavailable").map((b) => ({ id: b.id, tick: b.tick, title: b.title ?? "" }));
   const reviewTeams = teams;
@@ -571,8 +604,9 @@ function Workspace({
                   aria-label="Clear drawings on this round" title="Clear drawings"><IconClose /></button>
                 {map.floors.length > 1 ? (
                   <select className="select btn-sm" style={{ height: 26 }} aria-label="Floor" value={String(floor)}
-                    onChange={(e) => setFloor(e.target.value === "auto" ? "auto" : Number(e.target.value))}>
-                    <option value="auto">All floors</option>
+                    onChange={(e) => setFloor(e.target.value === "split" || e.target.value === "auto" ? e.target.value : Number(e.target.value))}>
+                    <option value="split">Both floors side by side</option>
+                    <option value="auto">Floors overlaid</option>
                     {map.floors.map((f, i) => <option key={f.id} value={i}>{f.label} floor</option>)}
                   </select>
                 ) : null}
@@ -598,7 +632,8 @@ function Workspace({
           </div>
 
           <div className="transport">
-            <Timeline manifest={manifest} round={round} tick={uiTick} events={payload?.events ?? []} players={players} bookmarks={roundBookmarks} onSeek={seek} />
+            <Timeline manifest={manifest} round={round} tick={uiTick} events={payload?.events ?? []} players={players} bookmarks={roundBookmarks} onSeek={seek}
+              fromTick={timelineFrom} />
             <div className="transport-row" role="toolbar" aria-label="Playback controls">
               <button type="button" className="btn btn-ghost icon-btn" onClick={() => stepRound(-1)} aria-label="Previous round"><IconPrevRound /></button>
               <button type="button" className="btn btn-ghost icon-btn" onClick={() => jumpEvent(-1)} aria-label="Previous event"><IconPrevEvent /></button>
@@ -614,7 +649,7 @@ function Workspace({
                 {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
               </select>
               <span className="mono muted" style={{ fontSize: 12, marginLeft: 6 }} aria-label="Elapsed in round">
-                {Math.floor(roundMs / 60000)}:{String(Math.floor((roundMs % 60000) / 1000)).padStart(2, "0")} elapsed · tick {Math.round(uiTick)}
+                {Math.floor(shownMs / 60000)}:{String(Math.floor((shownMs % 60000) / 1000)).padStart(2, "0")} {skipFreeze ? "into round" : "elapsed"} · tick {Math.round(uiTick)}
               </span>
               <span className="grow" />
               <label className="row" style={{ fontSize: 13 }}><input type="checkbox" checked={skipFreeze} onChange={(e) => setSkipFreeze(e.target.checked)} /> Skip freeze time</label>
@@ -638,7 +673,7 @@ function Workspace({
               <PlayersPanel manifest={manifest} round={round} frame={frameNow} players={players} inventory={inventory}
                 selected={selected} follow={follow} onSelect={setSelected} onFollow={setFollow} />
             ) : null}
-            {dockTab === "events" ? <EventsPanel manifest={manifest} round={round} events={payload?.events ?? []} tick={uiTick} players={players} onSeek={seek} /> : null}
+            {dockTab === "events" ? <EventsPanel manifest={manifest} round={round} events={(payload?.events ?? []).filter((e) => e.tick >= timelineFrom)} tick={uiTick} players={players} onSeek={seek} /> : null}
             {dockTab === "bookmarks" && canReview ? (
               <ReviewPanel kind="bookmark" manifest={manifest} replayId={id} round={round} tick={uiTick} items={review.bookmarks}
                 teams={reviewTeams} canReview={canReview} reload={review.reload} onOpen={goRound} composeSignal={composeSignal} />

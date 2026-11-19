@@ -13,8 +13,10 @@ export function bombWindow(events: GameEvent[], round: RoundSummary): [number, n
 export interface TimelineBookmark { id: string; tick: number; title: string }
 
 export function Timeline({
-  manifest, round, tick, events, players, bookmarks, onSeek,
+  manifest, round, tick, events, players, bookmarks, onSeek, fromTick,
 }: {
+  /** First tick shown (freeze end when freeze time is skipped). */
+  fromTick?: number;
   manifest: Manifest;
   round: RoundSummary;
   tick: number;
@@ -23,16 +25,19 @@ export function Timeline({
   bookmarks: TimelineBookmark[];
   onSeek: (tick: number) => void;
 }) {
-  const span = round.endTick - 1 - round.startTick;
-  const pct = (t: number) => `${((t - round.startTick) / span) * 100}%`;
-  const elapsed = (t: number) => formatMs((t - round.startTick) * manifest.tickIntervalMs);
+  const from = fromTick ?? round.startTick;
+  const span = Math.max(1, round.endTick - 1 - from);
+  const pct = (t: number) => `${((t - from) / span) * 100}%`;
+  const elapsed = (t: number) => formatMs((t - from) * manifest.tickIntervalMs);
   const name = (id?: string | null) => (id ? players.get(id)?.name ?? "?" : "World");
-  const markers = events.filter((e) => e.type === "kill" || e.type === "bomb_plant" || e.type === "bomb_defuse" || e.type === "bomb_explode");
+  const markers = events.filter((e) => e.tick >= from && (e.type === "kill" || e.type === "bomb_plant" || e.type === "bomb_defuse" || e.type === "bomb_explode"));
+  const shownBookmarks = bookmarks.filter((b) => b.tick >= from);
 
   return (
     <div className="timeline">
       {bombWindow(events, round) ? (() => {
-        const [a, b] = bombWindow(events, round)!;
+        const [a0, b] = bombWindow(events, round)!;
+        const a = Math.max(a0, from);
         return (
           <div className="timeline-bomb" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }} aria-hidden="true">
             <span>Bomb</span>
@@ -40,7 +45,7 @@ export function Timeline({
         );
       })() : null}
       <div className="timeline-markers">
-        {round.freezeEndTick !== null ? (
+        {round.freezeEndTick !== null && round.freezeEndTick > from ? (
           <button type="button" className="tmark" data-kind="freeze" style={{ left: pct(round.freezeEndTick) }}
             aria-label={`Freeze time ends at ${elapsed(round.freezeEndTick)}`} title="Freeze time ends" onClick={() => onSeek(round.freezeEndTick!)} />
         ) : null}
@@ -55,13 +60,13 @@ export function Timeline({
               aria-label={`${text} at ${elapsed(e.tick)}`} title={`${elapsed(e.tick)} · ${text}`} onClick={() => onSeek(e.tick)} />
           );
         })}
-        {bookmarks.map((b) => (
+        {shownBookmarks.map((b) => (
           <button type="button" key={b.id} className="tmark" data-kind="bookmark" style={{ left: pct(b.tick) }}
             aria-label={`Bookmark: ${b.title}`} title={`Bookmark · ${b.title}`} onClick={() => onSeek(b.tick)} />
         ))}
       </div>
       <label className="sr-only" htmlFor="round-scrubber">Round timeline</label>
-      <input id="round-scrubber" type="range" min={round.startTick} max={round.endTick - 1} step={1} value={Math.round(tick)}
+      <input id="round-scrubber" type="range" min={from} max={round.endTick - 1} step={1} value={Math.round(tick)}
         aria-valuetext={`${elapsed(tick)} into round ${round.displayNumber}`}
         onChange={(e) => onSeek(Number(e.target.value))}
         onKeyDown={(e) => {
